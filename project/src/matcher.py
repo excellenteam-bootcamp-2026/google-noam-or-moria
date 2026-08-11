@@ -1,27 +1,24 @@
 from __future__ import annotations
-import string
-import re
-from models import SearchData
 
-
-# Import normalize from the same directory
-from normalization import normalize
+# Import normalize from the src module
+from src.normalization import normalize
 
 def get_substitution_penalty(error_index: int) -> int:
+    # Return penalty based on error index for substitution
     penalties = [5, 4, 3, 2]
     if error_index < len(penalties):
         return penalties[error_index]
     return 1
 
-
 def get_missing_or_added_penalty(error_index: int) -> int:
+    # Return penalty based on error index for missing or added characters
     penalties = [10, 8, 6, 4]
     if error_index < len(penalties):
         return penalties[error_index]
     return 2
 
-
 def calculate_best_match(query: str, sentence: str) -> int | None:
+    # Normalize both query and sentence
     norm_query = normalize(query)
     norm_sentence = normalize(sentence)
 
@@ -74,51 +71,3 @@ def calculate_best_match(query: str, sentence: str) -> int | None:
                     best_score = score
 
     return best_score
-
-
-
-def create_ngrams(text: str, n: int) -> set[str]:
-    # Return an empty set if the text is shorter than n
-    if len(text) < n:
-        return set()
-    
-    # Generate all contiguous substrings of length n
-    ngrams = set()
-    for i in range(len(text) - n + 1):
-        ngrams.add(text[i : i + n])
-        
-    return ngrams
-
-
-def find_candidate_ids(normalized_query: str, search_data: SearchData) -> set[int]:
-    query_len = len(normalized_query)
-    
-    # Return empty set for empty query
-    if query_len == 0:
-        return set()
-        
-    # Length 1: Return all sentence IDs
-    if query_len == 1:
-        return set(search_data.sentences_by_id.keys())
-        
-    # Determine the n-gram size and target index based on query length
-    if query_len == 2 or query_len == 3:
-        n = 1
-        target_index = search_data.unigram_index
-    elif query_len == 4 or query_len == 5:
-        n = 2
-        target_index = search_data.bigram_index
-    else:
-        n = 3
-        target_index = search_data.trigram_index
-        
-    # Extract n-grams from the query
-    query_ngrams = create_ngrams(normalized_query, n)
-    
-    # Perform a set union operation across all matching sets
-    candidate_ids = set()
-    for gram in query_ngrams:
-        if gram in target_index:
-            candidate_ids.update(target_index[gram])
-            
-    return candidate_ids
