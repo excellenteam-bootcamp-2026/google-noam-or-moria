@@ -2,9 +2,8 @@ from __future__ import annotations
 import string
 import re
 
-# Import normalize from the single source of truth
-from src.normalization import normalize
-
+# Import normalize from the same directory
+from normalization import normalize
 
 def get_substitution_penalty(error_index: int) -> int:
     penalties = [5, 4, 3, 2]
