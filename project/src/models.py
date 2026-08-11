@@ -1,4 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass
+# Enable modern type hinting syntax in Python 3.8
 
 @dataclass
 class SentenceData:
