@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 @dataclass
 class SentenceData:
+    # A unique identifier used by the N-gram indexes
+    sentence_id: int
     # The original sentence exactly as it appears in the file
     original_sentence: str
     # The sentence after removing punctuation and standardizing spaces
@@ -22,3 +24,15 @@ class AutoCompleteData:
     offset: int
     # The calculated match score based on the penalty rules
     score: int
+
+
+@dataclass
+class SearchData:
+    """All data prepared during the offline initialization stage."""
+
+    # Fast access from an index result to the sentence and its metadata
+    sentences_by_id: dict[int, SentenceData]
+    # N-gram -> IDs of sentences containing that N-gram
+    unigram_index: dict[str, set[int]]
+    bigram_index: dict[str, set[int]]
+    trigram_index: dict[str, set[int]]
