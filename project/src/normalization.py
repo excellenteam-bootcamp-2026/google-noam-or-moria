@@ -10,4 +10,3 @@ def normalize(text: str) -> str:
     
     # Replace multiple spaces with a single space and trim edges
     return re.sub(r'\s+', ' ', text).strip()
-

@@ -1,73 +1,75 @@
-from __future__ import annotations
+import unittest
 
-# Import normalize from the src module
-from src.normalization import normalize
+# Import from the src module directly
+from src.matcher import calculate_best_match
 
-def get_substitution_penalty(error_index: int) -> int:
-    # Return penalty based on error index for substitution
-    penalties = [5, 4, 3, 2]
-    if error_index < len(penalties):
-        return penalties[error_index]
-    return 1
+class TestMatcher(unittest.TestCase):
+    def setUp(self):
+        # The base sentence from the project appendix
+        self.sentence = "To be or not to be, that is the question."
 
-def get_missing_or_added_penalty(error_index: int) -> int:
-    # Return penalty based on error index for missing or added characters
-    penalties = [10, 8, 6, 4]
-    if error_index < len(penalties):
-        return penalties[error_index]
-    return 2
+    def test_exact_matches(self):
+        # All 5 letters match
+        self.assertEqual(calculate_best_match("To be", self.sentence), 10)
+        # All 6 letters match
+        self.assertEqual(calculate_best_match("or Not", self.sentence), 12)
+        # All 7 letters match ignoring comma
+        self.assertEqual(calculate_best_match("be, that", self.sentence), 14)
 
-def calculate_best_match(query: str, sentence: str) -> int | None:
-    # Normalize both query and sentence
-    norm_query = normalize(query)
-    norm_sentence = normalize(sentence)
+    def test_substitution_errors(self):
+        # Base 10 minus 5 for incorrect first letter
+        self.assertEqual(calculate_best_match("2o be", self.sentence), 5)
+        # Base 10 minus 2 for incorrect fourth letter
+        self.assertEqual(calculate_best_match("to pe", self.sentence), 8)
+        # Error at the end of the input string
+        self.assertEqual(calculate_best_match("To bx", self.sentence), 9)
 
-    if not norm_query or not norm_sentence:
-        return None
+    def test_insertion_errors(self):
+        # Base 12 minus 4 for added fourth letter k
+        self.assertEqual(calculate_best_match("or knot", self.sentence), 8)
+        
+        # Added character at the beginning (xTo be -> normalized xto be)
+        # Matches 'to be' in sentence. Base score: 5*2=10. Penalty for idx 0 added: 10. Score: 0.
+        self.assertEqual(calculate_best_match("xTo be", self.sentence), 0)
+        
+        # Added character at the end (To bex -> normalized to bex)
+        # Matches 'to be'. Base score: 10. Penalty for idx 5 added: 2. Score: 8.
+        self.assertEqual(calculate_best_match("To bex", self.sentence), 8)
 
-    n = len(norm_query)
+    def test_deletion_errors(self):
+        # Test missing character at index 2 (third character)
+        # 5 matching chars (10) minus penalty for missing 3rd char (6) = 4
+        self.assertEqual(calculate_best_match("abdef", "abcdef"), 4)
+        
+        # Missing character at the beginning (o be -> matches to be)
+        # Matches 'to be' (length 5). Query length 4. Base score: 8. Penalty for idx 0 missing: 10. Score: -2.
+        self.assertEqual(calculate_best_match("o be", self.sentence), -2)
+        
+        # Missing character at the end (To b -> matches to be)
+        # Base score: 8. Penalty for idx 4 missing: 2. Score: 6.
+        self.assertEqual(calculate_best_match("To b", self.sentence), 6)
 
-    # Option 1: Exact match
-    if norm_query in norm_sentence:
-        return n * 2
+    def test_multiple_errors_return_none(self):
+        # Needs more than one letter correction, so it cannot be a match
+        self.assertIsNone(calculate_best_match("not be", self.sentence))
 
-    best_score = None
+    def test_empty_input_and_sentence(self):
+        # Empty input should return None
+        self.assertIsNone(calculate_best_match("", self.sentence))
+        
+        # Empty sentence should return None
+        self.assertIsNone(calculate_best_match("To be", ""))
+        
+        # Both empty should return None
+        self.assertIsNone(calculate_best_match("", ""))
 
-    # Option 2: Substitution (same length match with 1 character difference)
-    for i in range(len(norm_sentence) - n + 1):
-        sub = norm_sentence[i : i + n]
-        mismatches = [idx for idx in range(n) if norm_query[idx] != sub[idx]]
+    def test_sentence_shorter_than_query(self):
+        # Query is much longer than the sentence, impossible to match
+        self.assertIsNone(calculate_best_match("a very long query", "short"))
 
-        if len(mismatches) == 1:
-            err_idx = mismatches[0]
-            score = (n * 2) - get_substitution_penalty(err_idx)
-            if best_score is None or score > best_score:
-                best_score = score
+    def test_double_spaces_and_punctuation(self):
+        # Should normalize to "to be" and match perfectly with score 10
+        self.assertEqual(calculate_best_match("To   be!!", self.sentence), 10)
 
-    # Option 3: Character added in query (query is 1 character longer)
-    if n > 1:
-        for i in range(len(norm_sentence) - (n - 1) + 1):
-            sub = norm_sentence[i : i + n - 1]
-            for idx in range(n):
-                # Remove 1 character from query at idx and compare with sub
-                modified_query = norm_query[:idx] + norm_query[idx + 1 :]
-                if modified_query == sub:
-                    # Matched characters in sentence is n - 1
-                    base_score = (n - 1) * 2
-                    score = base_score - get_missing_or_added_penalty(idx)
-                    if best_score is None or score > best_score:
-                        best_score = score
-
-    # Option 4: Character missing in query (query is 1 character shorter)
-    for i in range(len(norm_sentence) - (n + 1) + 1):
-        sub = norm_sentence[i : i + n + 1]
-        for idx in range(n + 1):
-            # Remove 1 character from sentence window at idx and compare with query
-            modified_sub = sub[:idx] + sub[idx + 1 :]
-            if norm_query == modified_sub:
-                base_score = n * 2
-                score = base_score - get_missing_or_added_penalty(idx)
-                if best_score is None or score > best_score:
-                    best_score = score
-
-    return best_score
+if __name__ == '__main__':
+    unittest.main()
