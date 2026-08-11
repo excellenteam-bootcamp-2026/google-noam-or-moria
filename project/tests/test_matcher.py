@@ -29,8 +29,9 @@ class TestMatcher(unittest.TestCase):
         self.assertEqual(calculate_best_match("or knot", self.sentence), 8)
 
     def test_deletion_errors(self):
-        # Missing character in the query
-        self.assertEqual(calculate_best_match("To b", self.sentence), 8)
+        # Test missing character at index 2 (third character)
+        # 5 matching chars (10) minus penalty for missing 3rd char (6) = 4
+        self.assertEqual(calculate_best_match("abdef", "abcdef"), 4)
         
     def test_multiple_errors_return_none(self):
         # Needs more than one letter correction, so it cannot be a match
