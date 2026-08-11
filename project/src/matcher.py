@@ -2,14 +2,8 @@ from __future__ import annotations
 import string
 import re
 
-
-def normalize(text: str) -> str:
-    # Convert to lowercase
-    text = text.lower()
-    # Remove punctuation
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    # Standardize spaces
-    return re.sub(r'\s+', ' ', text).strip()
+# Import normalize from the single source of truth
+from src.normalization import normalize
 
 
 def get_substitution_penalty(error_index: int) -> int:
@@ -45,7 +39,7 @@ def calculate_best_match(query: str, sentence: str) -> int | None:
     for i in range(len(norm_sentence) - n + 1):
         sub = norm_sentence[i : i + n]
         mismatches = [idx for idx in range(n) if norm_query[idx] != sub[idx]]
-        
+
         if len(mismatches) == 1:
             err_idx = mismatches[0]
             score = (n * 2) - get_substitution_penalty(err_idx)
