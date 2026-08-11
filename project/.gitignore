@@ -1,0 +1,11 @@
+# Local test files
+sample.txt
+test_runner.py
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# IDE settings
+.vscode/
+.idea/
