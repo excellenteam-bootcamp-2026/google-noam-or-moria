@@ -1,3 +1,5 @@
+from collections import Counter
+
 from .loader import load_sentences
 from .models import SearchData, SentenceData
 
@@ -13,9 +15,9 @@ def create_ngrams(text: str, n: int) -> set[str]:
 def build_search_data(sentences: list[SentenceData]) -> SearchData:
     """Build the offline lookup data used by the autocomplete service."""
     sentences_by_id: dict[int, SentenceData] = {}
-    unigram_index: dict[str, set[int]] = {}
-    bigram_index: dict[str, set[int]] = {}
-    trigram_index: dict[str, set[int]] = {}
+    unigram_index: dict[str, list[int]] = {}
+    bigram_index: dict[str, list[int]] = {}
+    trigram_index: dict[str, list[int]] = {}
 
     indexes = {
         1: unigram_index,
@@ -31,7 +33,7 @@ def build_search_data(sentences: list[SentenceData]) -> SearchData:
 
         for n, index in indexes.items():
             for gram in create_ngrams(sentence.normalized_sentence, n):
-                index.setdefault(gram, set()).add(sentence.sentence_id)
+                index.setdefault(gram, []).append(sentence.sentence_id)
 
     return SearchData(
         sentences_by_id=sentences_by_id,
@@ -70,8 +72,19 @@ def find_candidate_ids(
         n = 3
         index = search_data.trigram_index
 
-    candidate_ids: set[int] = set()
-    for gram in create_ngrams(normalized_query, n):
-        candidate_ids.update(index.get(gram, set()))
+    query_ngrams = create_ngrams(normalized_query, n)
+    match_counts: Counter[int] = Counter()
 
-    return candidate_ids
+    for gram in query_ngrams:
+        for sentence_id in index.get(gram, []):
+            match_counts[sentence_id] += 1
+
+    # One edit can affect at most ``n`` adjacent N-grams. Requiring all other
+    # grams greatly reduces false candidates without excluding one-edit matches.
+    minimum_shared = max(1, len(query_ngrams) - n)
+
+    return {
+        sentence_id
+        for sentence_id, count in match_counts.items()
+        if count >= minimum_shared
+    }

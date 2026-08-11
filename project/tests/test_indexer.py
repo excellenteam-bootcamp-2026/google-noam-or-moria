@@ -42,14 +42,21 @@ class BuildSearchDataTests(TestCase):
 
         self.assertIs(search_data.sentences_by_id[4], first)
         self.assertIs(search_data.sentences_by_id[9], second)
-        self.assertEqual(search_data.unigram_index["p"], {4, 9})
-        self.assertEqual(search_data.bigram_index["py"], {4, 9})
-        self.assertEqual(search_data.trigram_index["pro"], {4})
+        self.assertEqual(search_data.unigram_index["p"], [4, 9])
+        self.assertEqual(search_data.bigram_index["py"], [4, 9])
+        self.assertEqual(search_data.trigram_index["pro"], [4])
+
+    def test_indexes_use_lists(self) -> None:
+        search_data = build_search_data([make_sentence(1, "python")])
+
+        self.assertIsInstance(search_data.unigram_index["p"], list)
+        self.assertIsInstance(search_data.bigram_index["py"], list)
+        self.assertIsInstance(search_data.trigram_index["pyt"], list)
 
     def test_repeated_ngram_adds_sentence_only_once(self) -> None:
         search_data = build_search_data([make_sentence(3, "banana")])
 
-        self.assertEqual(search_data.bigram_index["an"], {3})
+        self.assertEqual(search_data.bigram_index["an"], [3])
 
     def test_duplicate_sentence_ids_are_rejected(self) -> None:
         with self.assertRaises(ValueError):
@@ -71,7 +78,7 @@ class BuildSearchDataTests(TestCase):
             sentence = search_data.sentences_by_id[0]
             self.assertEqual(sentence.original_sentence, "Python, Programming!")
             self.assertEqual(sentence.normalized_sentence, "python programming")
-            self.assertEqual(search_data.trigram_index["pro"], {0})
+            self.assertEqual(search_data.trigram_index["pro"], [0])
 
 
 class FindCandidateIdsTests(TestCase):
@@ -103,3 +110,27 @@ class FindCandidateIdsTests(TestCase):
         candidates = find_candidate_ids("progranming", self.search_data)
 
         self.assertIn(0, candidates)
+
+    def test_three_character_query_rejects_only_one_shared_character(self) -> None:
+        search_data = build_search_data(
+            [make_sentence(0, "a"), make_sentence(1, "car")]
+        )
+
+        self.assertEqual(find_candidate_ids("cat", search_data), {1})
+
+    def test_long_query_requires_most_trigrams(self) -> None:
+        search_data = build_search_data(
+            [
+                make_sentence(0, "programming language"),
+                make_sentence(1, "progress report"),
+            ]
+        )
+
+        self.assertEqual(find_candidate_ids("programming", search_data), {0})
+
+    def test_one_typo_in_long_query_keeps_correct_sentence(self) -> None:
+        search_data = build_search_data(
+            [make_sentence(0, "programming language")]
+        )
+
+        self.assertEqual(find_candidate_ids("progranming", search_data), {0})
