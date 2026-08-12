@@ -52,7 +52,7 @@ def find_exact_candidate_ids(
     normalized_query: str,
     search_data: SearchData,
 ) -> set[int]:
-    """Return candidates containing every N-gram of an exact query."""
+    """Return candidates from the query's rarest exact-match N-gram."""
     query_length = len(normalized_query)
 
     if query_length == 0:
@@ -64,19 +64,13 @@ def find_exact_candidate_ids(
     if query_length == 2:
         return set(search_data.bigram_index.get(normalized_query, []))
 
-    candidate_lists = [
-        search_data.trigram_index.get(
-            normalized_query[index : index + 3],
-            [],
-        )
-        for index in range(query_length - 2)
+    posting_lists = [
+        search_data.trigram_index.get(gram, [])
+        for gram in create_ngrams(normalized_query, 3)
     ]
 
-    candidates = set(candidate_lists[0])
-    for candidate_list in candidate_lists[1:]:
-        candidates.intersection_update(candidate_list)
-
-    return candidates
+    smallest_posting = min(posting_lists, key=len)
+    return set(smallest_posting)
 
 
 def find_candidate_ids(

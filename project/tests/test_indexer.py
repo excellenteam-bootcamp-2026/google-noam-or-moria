@@ -203,10 +203,33 @@ class FindExactCandidateIdsTests(TestCase):
             {0, 2, 3, 4},
         )
 
-    def test_long_query_intersects_all_trigram_postings(self) -> None:
+    def test_long_query_uses_its_rarest_trigram_posting(self) -> None:
         self.assertEqual(
             find_exact_candidate_ids("concatenate", self.search_data),
             {3},
+        )
+
+    def test_rarest_posting_is_returned_without_intersecting_all_postings(self) -> None:
+        search_data = build_search_data(
+            [
+                make_sentence(0, "abcdef"),
+                make_sentence(1, "contains cde only"),
+                make_sentence(2, "abc bcd def"),
+                make_sentence(3, "another abc bcd def"),
+            ]
+        )
+
+        # "cde" has the shortest posting list. Candidate 1 is intentionally
+        # a false positive that the matcher must reject.
+        self.assertEqual(
+            find_exact_candidate_ids("abcdef", search_data),
+            {0, 1},
+        )
+
+    def test_missing_trigram_makes_exact_candidate_set_empty(self) -> None:
+        self.assertEqual(
+            find_exact_candidate_ids("catxyz", self.search_data),
+            set(),
         )
 
     def test_long_query_does_not_scan_unrelated_sentences(self) -> None:
