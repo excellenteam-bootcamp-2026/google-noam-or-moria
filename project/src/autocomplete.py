@@ -1,5 +1,7 @@
 """Selection and state management for autocomplete suggestions."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable, Mapping
 from heapq import nsmallest
 

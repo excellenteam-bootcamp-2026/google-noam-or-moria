@@ -1,2 +1,4 @@
-protobuf==7.35.1
-grpcio-tools==1.83.0
+# Python 3.8-compatible versions. Regenerate search_index_pb2.py with these
+# versions whenever the schema changes.
+protobuf==4.25.6
+grpcio-tools==1.59.5

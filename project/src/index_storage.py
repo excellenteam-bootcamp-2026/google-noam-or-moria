@@ -1,5 +1,7 @@
 """Persistence for the offline N-gram indexes using Protocol Buffers."""
 
+from __future__ import annotations
+
 import hashlib
 import os
 from pathlib import Path
