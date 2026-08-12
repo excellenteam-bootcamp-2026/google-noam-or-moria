@@ -1,7 +1,13 @@
 from collections import Counter
+import os
+from pathlib import Path
 
 from .loader import load_sentences
 from .models import SearchData, SentenceData
+
+
+CORPUS_PATH_ENV = "GOOGLE_AUTOCOMPLETE_CORPUS"
+DEFAULT_CORPUS_PATH = Path.home() / "OneDrive" / "מסמכים" / "Archive (1)"
 
 
 def create_ngrams(text: str, n: int) -> set[str]:
@@ -43,9 +49,18 @@ def build_search_data(sentences: list[SentenceData]) -> SearchData:
     )
 
 
-def initialize(root_path: str) -> SearchData:
-    """Load the text corpus and build all offline search indexes."""
-    return build_search_data(load_sentences(root_path))
+def initialize(root_path: str | None = None) -> SearchData:
+    """Load the configured text corpus and build all offline indexes.
+
+    An explicit path takes priority. Otherwise the path can be configured with
+    ``GOOGLE_AUTOCOMPLETE_CORPUS`` and finally falls back to the local archive
+    location used by this project.
+    """
+    corpus_path = root_path or os.environ.get(
+        CORPUS_PATH_ENV,
+        str(DEFAULT_CORPUS_PATH),
+    )
+    return build_search_data(load_sentences(corpus_path))
 
 
 def find_exact_candidate_ids(

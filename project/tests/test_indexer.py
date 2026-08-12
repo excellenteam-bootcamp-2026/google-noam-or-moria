@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from src.indexer import (
     build_search_data,
@@ -91,6 +92,33 @@ class BuildSearchDataTests(TestCase):
             self.assertEqual(sentence.original_sentence, "Python, Programming!")
             self.assertEqual(sentence.normalized_sentence, "python programming")
             self.assertEqual(search_data.trigram_index["pro"], [0])
+
+    def test_initialize_uses_configured_corpus_when_path_is_omitted(self) -> None:
+        configured_path = "configured-corpus"
+
+        with (
+            patch.dict(
+                "os.environ",
+                {"GOOGLE_AUTOCOMPLETE_CORPUS": configured_path},
+            ),
+            patch("src.indexer.load_sentences", return_value=[]) as loader,
+        ):
+            search_data = initialize()
+
+        loader.assert_called_once_with(configured_path)
+        self.assertEqual(search_data.sentences_by_id, {})
+
+    def test_explicit_path_overrides_configured_corpus(self) -> None:
+        with (
+            patch.dict(
+                "os.environ",
+                {"GOOGLE_AUTOCOMPLETE_CORPUS": "configured-corpus"},
+            ),
+            patch("src.indexer.load_sentences", return_value=[]) as loader,
+        ):
+            initialize("explicit-corpus")
+
+        loader.assert_called_once_with("explicit-corpus")
 
 
 class FindCandidateIdsTests(TestCase):
