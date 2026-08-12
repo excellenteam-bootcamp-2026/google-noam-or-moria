@@ -1,12 +1,14 @@
-import string
 import re
+import string
 
 def normalize(text: str) -> str:
-    # Convert all characters to lowercase
+    """Normalize case, punctuation, and whitespace for searching.
+
+    Punctuation is replaced with whitespace rather than removed.  This keeps
+    adjacent words separated: ``"be,that"`` and ``"be that"`` normalize to
+    the same value.
+    """
     text = text.lower()
-    
-    # Remove all punctuation using string translation
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    
-    # Replace multiple spaces with a single space and trim edges
+
+    text = text.translate(str.maketrans({character: " " for character in string.punctuation}))
     return re.sub(r'\s+', ' ', text).strip()

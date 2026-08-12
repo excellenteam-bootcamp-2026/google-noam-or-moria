@@ -34,6 +34,7 @@ class TestMatcher(unittest.TestCase):
 
     def test_normalizes_punctuation_and_whitespace(self):
         self.assertEqual(calculate_best_match("To   be!!", self.sentence), 10)
+        self.assertEqual(calculate_best_match("be,that", self.sentence), 14)
 
     def test_long_query_with_one_error(self):
         query = "abcdefghijklmnopqrstuvwxyz" * 4
