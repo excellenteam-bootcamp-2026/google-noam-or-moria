@@ -3,71 +3,50 @@ from unittest.mock import Mock, patch
 from src.autocomplete import (
     build_best_completions,
     get_best_k_completions,
-    select_best_completions,
+    initialize,
     select_staged_completions,
-    set_sentences,
+    set_search_data,
 )
 from src.models import SearchData, SentenceData
 
 
-def sentence(text: str, path: str = "data.txt", offset: int = 1) -> SentenceData:
-    return SentenceData(0, text, text.lower(), path, offset)
-
-
-def test_returns_only_matching_sentences_with_metadata() -> None:
-    sentences = [
-        sentence("First result", "first.txt", 3),
-        sentence("Ignored result", "ignored.txt", 7),
-    ]
+def test_required_public_function_uses_initialized_search_index() -> None:
+    indexed_sentences = {
+        1: SentenceData(1, "Stored sentence", "stored sentence", "data.txt", 3),
+    }
+    search_data = SearchData(indexed_sentences, {}, {}, {})
+    set_search_data(search_data)
 
     with patch(
-        "src.autocomplete.calculate_best_match", side_effect=[12, None]
-    ):
-        results = select_best_completions("result", sentences)
+        "src.autocomplete.select_indexed_completions",
+        return_value=[],
+    ) as indexed_search:
+        get_best_k_completions("stored")
 
-    assert len(results) == 1
-    assert results[0].completed_sentence == "First result"
-    assert results[0].source_text == "first.txt"
-    assert results[0].offset == 3
-    assert results[0].score == 12
+    indexed_search.assert_called_once_with("stored", search_data, k=5)
 
 
-def test_sorts_by_score_then_alphabetically_and_limits_to_five() -> None:
-    sentences = [
-        sentence(name)
-        for name in ["Zulu", "Echo", "Alpha", "Golf", "Beta", "Delta"]
-    ]
+def test_initialization_prepares_the_required_public_function() -> None:
+    search_data = SearchData({}, {}, {}, {})
 
-    with patch(
-        "src.autocomplete.calculate_best_match",
-        side_effect=[10, 12, 12, 9, 12, 11],
-    ):
-        results = select_best_completions("query", sentences)
+    with patch("src.indexer.initialize", return_value=search_data) as builder:
+        initialize("corpus")
 
-    assert [result.completed_sentence for result in results] == [
-        "Alpha",
-        "Beta",
-        "Echo",
-        "Delta",
-        "Zulu",
-    ]
+    builder.assert_called_once_with("corpus")
+    with patch("src.autocomplete.select_indexed_completions", return_value=[]) as search:
+        get_best_k_completions("query")
+
+    search.assert_called_once_with("query", search_data, k=5)
 
 
-def test_public_function_uses_initialized_sentences() -> None:
-    set_sentences([sentence("Stored sentence")])
-
-    with patch("src.autocomplete.calculate_best_match", return_value=8):
-        results = get_best_k_completions("stored")
-
-    assert [result.completed_sentence for result in results] == ["Stored sentence"]
-
-
-def test_empty_query_and_non_positive_limit_return_no_results() -> None:
-    with patch("src.autocomplete.calculate_best_match") as matcher:
-        assert select_best_completions("", [sentence("Anything")]) == []
-        assert select_best_completions("query", [sentence("Anything")], k=0) == []
-
-    matcher.assert_not_called()
+def test_required_public_function_rejects_use_before_initialization() -> None:
+    with patch("src.autocomplete._search_data", None):
+        try:
+            get_best_k_completions("query")
+        except RuntimeError as error:
+            assert "not been initialized" in str(error)
+        else:
+            raise AssertionError("Expected RuntimeError before initialization")
 
 
 def test_builds_ranked_results_from_indexed_candidate_scores() -> None:
