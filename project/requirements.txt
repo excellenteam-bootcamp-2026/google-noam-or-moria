@@ -2,3 +2,4 @@
 # versions whenever the schema changes.
 protobuf==4.25.6
 grpcio-tools==1.59.5
+pytest==8.3.5
