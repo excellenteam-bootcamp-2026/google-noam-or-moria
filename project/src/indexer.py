@@ -48,6 +48,37 @@ def initialize(root_path: str) -> SearchData:
     return build_search_data(load_sentences(root_path))
 
 
+def find_exact_candidate_ids(
+    normalized_query: str,
+    search_data: SearchData,
+) -> set[int]:
+    """Return candidates containing every N-gram of an exact query."""
+    query_length = len(normalized_query)
+
+    if query_length == 0:
+        return set()
+
+    if query_length == 1:
+        return set(search_data.unigram_index.get(normalized_query, []))
+
+    if query_length == 2:
+        return set(search_data.bigram_index.get(normalized_query, []))
+
+    candidate_lists = [
+        search_data.trigram_index.get(
+            normalized_query[index : index + 3],
+            [],
+        )
+        for index in range(query_length - 2)
+    ]
+
+    candidates = set(candidate_lists[0])
+    for candidate_list in candidate_lists[1:]:
+        candidates.intersection_update(candidate_list)
+
+    return candidates
+
+
 def find_candidate_ids(
     normalized_query: str,
     search_data: SearchData,
@@ -59,8 +90,9 @@ def find_candidate_ids(
         return set()
 
     if query_length == 1:
-        # A single incorrect character gives the index no reliable gram to use.
-        return set(search_data.sentences_by_id)
+        # For a one-character query, staged search assumes no typo so the
+        # scoring engine does not receive the entire corpus.
+        return set(search_data.unigram_index.get(normalized_query, []))
 
     if query_length <= 3:
         n = 1

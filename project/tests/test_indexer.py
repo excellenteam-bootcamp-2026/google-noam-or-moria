@@ -6,6 +6,7 @@ from src.indexer import (
     build_search_data,
     create_ngrams,
     find_candidate_ids,
+    find_exact_candidate_ids,
     initialize,
 )
 from src.models import SentenceData
@@ -94,8 +95,11 @@ class FindCandidateIdsTests(TestCase):
     def test_empty_query_has_no_candidates(self) -> None:
         self.assertEqual(find_candidate_ids("", self.search_data), set())
 
-    def test_one_character_query_returns_every_sentence(self) -> None:
-        self.assertEqual(find_candidate_ids("x", self.search_data), {0, 1, 2})
+    def test_one_character_query_returns_only_sentences_containing_it(self) -> None:
+        self.assertEqual(find_candidate_ids("p", self.search_data), {0, 2})
+
+    def test_unknown_one_character_query_has_no_candidates(self) -> None:
+        self.assertEqual(find_candidate_ids("x", self.search_data), set())
 
     def test_short_query_uses_unigrams(self) -> None:
         self.assertEqual(find_candidate_ids("py", self.search_data), {0, 2})
@@ -134,3 +138,43 @@ class FindCandidateIdsTests(TestCase):
         )
 
         self.assertEqual(find_candidate_ids("progranming", search_data), {0})
+
+
+class FindExactCandidateIdsTests(TestCase):
+    def setUp(self) -> None:
+        self.search_data = build_search_data(
+            [
+                make_sentence(0, "cat catalog"),
+                make_sentence(1, "a dog"),
+                make_sentence(2, "educate"),
+                make_sentence(3, "concatenate strings"),
+                make_sentence(4, "scattered letters"),
+            ]
+        )
+
+    def test_empty_query_has_no_exact_candidates(self) -> None:
+        self.assertEqual(find_exact_candidate_ids("", self.search_data), set())
+
+    def test_one_character_uses_unigram_index(self) -> None:
+        self.assertEqual(
+            find_exact_candidate_ids("c", self.search_data),
+            {0, 2, 3, 4},
+        )
+
+    def test_two_characters_use_bigram_index(self) -> None:
+        self.assertEqual(
+            find_exact_candidate_ids("ca", self.search_data),
+            {0, 2, 3, 4},
+        )
+
+    def test_long_query_intersects_all_trigram_postings(self) -> None:
+        self.assertEqual(
+            find_exact_candidate_ids("concatenate", self.search_data),
+            {3},
+        )
+
+    def test_long_query_does_not_scan_unrelated_sentences(self) -> None:
+        self.assertEqual(
+            find_exact_candidate_ids("catalog", self.search_data),
+            {0},
+        )
