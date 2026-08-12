@@ -29,10 +29,10 @@ def print_completions(query: str) -> None:
         )
 
 
-def run_cli(root_path: str | None = None) -> None:
+def run_cli(root_path: str | None = None, use_native: bool = False) -> None:
     """Load the data and run the interactive autocomplete prompt."""
 
-    initialize(root_path)
+    initialize(root_path, use_native=use_native)
     current_query = ""
 
     print("The system is ready. Enter your text:")
@@ -57,5 +57,10 @@ if __name__ == "__main__":
         nargs="?",
         help="Root folder containing text files",
     )
+    parser.add_argument(
+        "--native",
+        action="store_true",
+        help="Use the compiled C++ candidate index",
+    )
     arguments = parser.parse_args()
-    run_cli(arguments.root_path)
+    run_cli(arguments.root_path, use_native=arguments.native)

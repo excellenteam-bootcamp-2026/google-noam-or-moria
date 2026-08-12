@@ -50,18 +50,27 @@ def build_search_data(sentences: list[SentenceData]) -> SearchData:
     )
 
 
-def initialize(root_path: str | None = None) -> SearchData:
-    """Load the configured text corpus and build all offline indexes.
+def configured_corpus_path(root_path: str | None = None) -> str:
+    """Resolve an explicit, configured, or default corpus directory."""
 
-    An explicit path takes priority. Otherwise the path can be configured with
-    ``GOOGLE_AUTOCOMPLETE_CORPUS`` and finally falls back to the local archive
-    location used by this project.
-    """
-    corpus_path = root_path or os.environ.get(
+    return root_path or os.environ.get(
         CORPUS_PATH_ENV,
         str(DEFAULT_CORPUS_PATH),
     )
-    return build_search_data(load_sentences(corpus_path))
+
+
+def load_configured_sentences(
+    root_path: str | None = None,
+) -> list[SentenceData]:
+    """Load sentences without committing to a Python or native index."""
+
+    return load_sentences(configured_corpus_path(root_path))
+
+
+def initialize(root_path: str | None = None) -> SearchData:
+    """Load the configured text corpus and build all Python indexes."""
+
+    return build_search_data(load_configured_sentences(root_path))
 
 
 def find_exact_candidate_ids(

@@ -58,3 +58,41 @@ Installer before compiling the native component. The workload should include:
 
 The Protocol Buffer compiler/runtime will be configured after the native
 compiler is available.
+
+## Native prototype results
+
+The first native implementation is in `native/`. It is a C++17 DLL loaded by
+Python with `ctypes`, so the Python public API and CLI remain unchanged. Build
+it from the `project` directory with:
+
+```powershell
+cmake -S native -B native/build -A x64
+cmake --build native/build --config Release
+cmake --build native/build --config Release --target RUN_TESTS
+```
+
+Run the CLI with the native index:
+
+```powershell
+python -m src.main C:\path\to\corpus --native
+```
+
+The reproducible comparison tool is `profiling/compare_native.py`. On a sample
+of 100,000 real sentences, the first comparison produced:
+
+| Operation | Python | C++ | Improvement |
+|---|---:|---:|---:|
+| Build index | 1.075 s | 0.708 s | 1.5x |
+| Query `a` | 18.240 ms | 6.333 ms | 2.9x |
+| Query `th` | 10.926 ms | 3.414 ms | 3.2x |
+| Query `the` | 10.200 ms | 3.282 ms | 3.1x |
+| Ten-word exact query | 0.255 ms | 0.092 ms | 2.8x |
+| Ten-word query with an early typo | 0.142 ms | 0.061 ms | 2.3x |
+
+Every native result was identical to the Python result in this comparison.
+The C++ unit test and all 55 discoverable Python unit tests also pass.
+
+In native mode Python keeps sentence metadata for the required output, but it
+does not build duplicate Python N-gram indexes. The next step is Protocol
+Buffers, allowing the C++ engine to load records directly and avoiding the
+per-sentence Python-to-C++ initialization boundary.
