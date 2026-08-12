@@ -35,6 +35,6 @@ class SearchData:
     # Fast access from an index result to the sentence and its metadata
     sentences_by_id: dict[int, SentenceData]
     # N-gram -> IDs of sentences containing that N-gram
-    unigram_index: dict[str, set[int]]
-    bigram_index: dict[str, set[int]]
-    trigram_index: dict[str, set[int]]
+    unigram_index: dict[str, list[int]]
+    bigram_index: dict[str, list[int]]
+    trigram_index: dict[str, list[int]]
