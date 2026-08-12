@@ -12,3 +12,7 @@ __pycache__/
 
 # Native build output
 native/build/
+vcpkg_installed/
+
+# Generated corpus data
+data/*.pb

@@ -96,3 +96,30 @@ In native mode Python keeps sentence metadata for the required output, but it
 does not build duplicate Python N-gram indexes. The next step is Protocol
 Buffers, allowing the C++ engine to load records directly and avoiding the
 per-sentence Python-to-C++ initialization boundary.
+
+## Protocol Buffers and full-corpus conversion
+
+`proto/corpus.proto` defines a versioned `CorpusChunk` containing repeated
+`SentenceRecord` values. Every record preserves the ID, original text,
+normalized text, source path, and line offset. `src/protobuf_store.py` converts
+the text corpus as a stream and defaults to 50,000 records per file.
+
+```powershell
+python -m src.protobuf_store C:\path\to\corpus C:\path\to\new-output
+```
+
+The supplied full archive was converted and read back successfully:
+
+| Measurement | Result |
+|---|---:|
+| Source sentences | 2,583,987 |
+| Protobuf chunks | 52 |
+| Total Protobuf size | 448.5 MiB |
+| Streaming conversion time | 78.884 s |
+| Full sequential read time | 10.180 s |
+| First / last sentence ID | 0 / 2,583,986 |
+
+The chunk design avoids the Protocol Buffer size limit of one enormous
+message, permits sequential loading, and bounds temporary conversion memory.
+All 59 discoverable Python tests pass, including multi-chunk round-trip and
+overwrite-protection tests.

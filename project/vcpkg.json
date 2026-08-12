@@ -1,0 +1,8 @@
+{
+  "name": "google-autocomplete-native",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "protobuf"
+  ],
+  "builtin-baseline": "aae277acf4e7de287ddb5e208b5316614de6aad7"
+}
