@@ -1,26 +1,37 @@
 import unittest
-from src.normalization import normalize
 
-class TestNormalization(unittest.TestCase):
-    def test_lowercase_conversion(self):
-        # Ensure text is converted to lowercase
-        self.assertEqual(normalize("HELLO WORLD"), "hello world")
-        
-    def test_punctuation_removal(self):
-        # Ensure all punctuation is removed
-        self.assertEqual(normalize("hello, world! it's python."), "hello world its python")
-        
-    def test_whitespace_reduction(self):
-        # Ensure multiple spaces are reduced to a single space
-        self.assertEqual(normalize("hello    world \t test"), "hello world test")
-        
-    def test_strip_edges(self):
-        # Ensure leading and trailing whitespace is removed
-        self.assertEqual(normalize("  hello world  "), "hello world")
+from src.matcher import calculate_best_match
 
-    def test_empty_string(self):
-        # Ensure empty strings are handled correctly
-        self.assertEqual(normalize(""), "")
 
-if __name__ == '__main__':
+class TestMatcher(unittest.TestCase):
+    def setUp(self):
+        self.sentence = "To be or not to be, that is the question."
+
+    def test_exact_matches(self):
+        self.assertEqual(calculate_best_match("To be", self.sentence), 10)
+        self.assertEqual(calculate_best_match("or Not", self.sentence), 12)
+        self.assertEqual(calculate_best_match("be, that", self.sentence), 14)
+
+    def test_substitution_errors(self):
+        self.assertEqual(calculate_best_match("2o be", self.sentence), 5)
+        self.assertEqual(calculate_best_match("to pe", self.sentence), 8)
+        self.assertEqual(calculate_best_match("To bx", self.sentence), 9)
+
+    def test_added_character(self):
+        self.assertEqual(calculate_best_match("or knot", self.sentence), 8)
+
+    def test_missing_character(self):
+        self.assertEqual(calculate_best_match("abdef", "abcdef"), 4)
+
+    def test_multiple_errors_return_none(self):
+        self.assertIsNone(calculate_best_match("not be", self.sentence))
+
+    def test_empty_input_returns_none(self):
+        self.assertIsNone(calculate_best_match("", self.sentence))
+
+    def test_normalizes_punctuation_and_whitespace(self):
+        self.assertEqual(calculate_best_match("To   be!!", self.sentence), 10)
+
+
+if __name__ == "__main__":
     unittest.main()
