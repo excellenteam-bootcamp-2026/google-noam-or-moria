@@ -47,16 +47,19 @@ def run_cli(
     current_query = ""
 
     print("The system is ready. Enter your text:")
-    while True:
-        typed_text = input(current_query)
-        if typed_text == "#":
-            current_query = update_query(current_query, typed_text)
-            print("Query reset.")
-            continue
+    try:
+        while True:
+            typed_text = input(current_query)
+            if typed_text == "#":
+                current_query = update_query(current_query, typed_text)
+                print("Query reset.")
+                continue
 
-        current_query = update_query(current_query, typed_text)
-        if current_query:
-            print_completions(current_query)
+            current_query = update_query(current_query, typed_text)
+            if current_query:
+                print_completions(current_query)
+    except (EOFError, KeyboardInterrupt):
+        print("\nGoodbye.")
 
 
 if __name__ == "__main__":

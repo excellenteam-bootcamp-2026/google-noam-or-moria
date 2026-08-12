@@ -120,7 +120,7 @@ The supplied full archive was converted and read back successfully:
 
 The chunk design avoids the Protocol Buffer size limit of one enormous
 message, permits sequential loading, and bounds temporary conversion memory.
-All 76 `pytest` tests pass, including multi-chunk round-trip,
+All 79 `pytest` tests pass, including CLI behavior, multi-chunk round-trip,
 overwrite-protection, and direct C++ loading tests.
 
 ### Direct C++ loading

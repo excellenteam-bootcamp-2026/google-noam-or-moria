@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from src.main import print_completions, update_query
+from src.main import print_completions, run_cli, update_query
 from src.models import AutoCompleteData
 
 
@@ -42,3 +42,36 @@ def test_prints_message_when_there_are_no_suggestions(capsys) -> None:
         print_completions("missing")
 
     assert capsys.readouterr().out == "No suggestions found.\n"
+
+
+def test_cli_loads_protobuf_directly_and_exits_cleanly(capsys) -> None:
+    with (
+        patch("src.main.initialize_from_protobuf") as protobuf_initialize,
+        patch("src.main.initialize") as text_initialize,
+        patch("builtins.input", side_effect=KeyboardInterrupt),
+    ):
+        run_cli(protobuf_directory="chunks")
+
+    protobuf_initialize.assert_called_once_with("chunks")
+    text_initialize.assert_not_called()
+    assert "Goodbye." in capsys.readouterr().out
+
+
+def test_cli_passes_native_mode_to_text_initialization() -> None:
+    with (
+        patch("src.main.initialize") as initialize,
+        patch("builtins.input", side_effect=EOFError),
+    ):
+        run_cli("corpus", use_native=True)
+
+    initialize.assert_called_once_with("corpus", use_native=True)
+
+
+def test_cli_hash_resets_before_continuing(capsys) -> None:
+    with (
+        patch("src.main.initialize"),
+        patch("builtins.input", side_effect=["#", KeyboardInterrupt]),
+    ):
+        run_cli("corpus")
+
+    assert "Query reset." in capsys.readouterr().out
