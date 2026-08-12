@@ -4,6 +4,15 @@ from src.autocomplete import select_indexed_completions
 from src.models import SearchData
 
 
+def update_query(current_query: str, typed_text: str) -> str:
+    """Return the next query after typing text or requesting a reset."""
+
+    if typed_text == "#":
+        return ""
+
+    return current_query + typed_text
+
+
 def print_completions(query: str, search_data: SearchData) -> None:
     """Print the best completions for the current query."""
 
@@ -34,11 +43,11 @@ def run_cli(root_path: str) -> None:
     while True:
         typed_text = input(current_query)
         if typed_text == "#":
-            current_query = ""
+            current_query = update_query(current_query, typed_text)
             print("Query reset.")
             continue
 
-        current_query += typed_text
+        current_query = update_query(current_query, typed_text)
         if current_query:
             print_completions(current_query, search_data)
 

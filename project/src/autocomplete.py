@@ -1,6 +1,7 @@
 """Selection and state management for autocomplete suggestions."""
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from heapq import nsmallest
 
 from src.matcher import calculate_best_match
 from src.models import AutoCompleteData, SearchData, SentenceData
@@ -128,20 +129,64 @@ def select_indexed_completions(
 
     # These modules are supplied by the teammates' branches. Keeping the
     # imports here lets this branch's independent unit tests run before merge.
-    from src.indexer import find_candidate_ids
+    from src.indexer import find_candidate_ids, find_exact_candidate_ids
     from src.normalization import normalize
 
     normalized_query = normalize(query)
     if not normalized_query:
         return []
 
-    candidate_ids = find_candidate_ids(normalized_query, search_data)
-    candidate_scores = {
-        sentence_id: calculate_best_match(
+    return select_staged_completions(
+        normalized_query,
+        search_data,
+        find_exact_candidate_ids,
+        find_candidate_ids,
+        k,
+    )
+
+
+def select_staged_completions(
+    normalized_query: str,
+    search_data: SearchData,
+    find_exact_candidates: Callable[[str, SearchData], set[int]],
+    find_fuzzy_candidates: Callable[[str, SearchData], set[int]],
+    k: int = 5,
+) -> list[AutoCompleteData]:
+    """Search exact candidates first and expand to fuzzy ones only if needed."""
+
+    if k <= 0 or not normalized_query:
+        return []
+
+    exact_score = len(normalized_query) * 2
+    exact_candidate_ids = find_exact_candidates(normalized_query, search_data)
+    exact_ids = nsmallest(
+        k,
+        (
+            sentence_id
+            for sentence_id in exact_candidate_ids
+            if normalized_query
+            in search_data.sentences_by_id[sentence_id].normalized_sentence
+        ),
+        key=lambda sentence_id: (
+            search_data.sentences_by_id[sentence_id].original_sentence.casefold(),
+            search_data.sentences_by_id[sentence_id].original_sentence,
+            search_data.sentences_by_id[sentence_id].source_path,
+            search_data.sentences_by_id[sentence_id].offset,
+        ),
+    )
+    exact_matches = {sentence_id: exact_score for sentence_id in exact_ids}
+    if len(exact_matches) >= k:
+        return build_best_completions(exact_matches, search_data, k)
+
+    candidate_scores: dict[int, int | None] = dict(exact_matches)
+    fuzzy_candidate_ids = find_fuzzy_candidates(normalized_query, search_data)
+    # Exact-index false positives may still be valid one-edit matches, so only
+    # candidates already verified as exact are excluded from fuzzy scoring.
+    additional_ids = fuzzy_candidate_ids - exact_matches.keys()
+    for sentence_id in additional_ids:
+        candidate_scores[sentence_id] = calculate_best_match(
             normalized_query,
             search_data.sentences_by_id[sentence_id].normalized_sentence,
         )
-        for sentence_id in candidate_ids
-    }
 
     return build_best_completions(candidate_scores, search_data, k)
