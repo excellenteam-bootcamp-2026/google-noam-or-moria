@@ -23,6 +23,9 @@ class TestMatcher(unittest.TestCase):
     def test_missing_character(self):
         self.assertEqual(calculate_best_match("abdef", "abcdef"), 4)
 
+    def test_repeated_characters_keep_the_best_edit_position(self):
+        self.assertEqual(calculate_best_match("aab", "ab"), -4)
+
     def test_multiple_errors_return_none(self):
         self.assertIsNone(calculate_best_match("not be", self.sentence))
 
@@ -31,6 +34,11 @@ class TestMatcher(unittest.TestCase):
 
     def test_normalizes_punctuation_and_whitespace(self):
         self.assertEqual(calculate_best_match("To   be!!", self.sentence), 10)
+
+    def test_long_query_with_one_error(self):
+        query = "abcdefghijklmnopqrstuvwxyz" * 4
+        sentence = f"prefix {query[:80]}x{query[81:]} suffix"
+        self.assertEqual(calculate_best_match(query, sentence), len(query) * 2 - 1)
 
 
 if __name__ == "__main__":
