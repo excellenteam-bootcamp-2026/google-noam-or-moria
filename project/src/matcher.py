@@ -1,74 +1,139 @@
 from __future__ import annotations
-import string
-import re
 
-# Import normalize from the same directory
-from normalization import normalize
+from src.normalization import normalize
+
 
 def get_substitution_penalty(error_index: int) -> int:
+    """Return the score penalty for one replaced character."""
     penalties = [5, 4, 3, 2]
-    if error_index < len(penalties):
-        return penalties[error_index]
-    return 1
+    return penalties[error_index] if error_index < len(penalties) else 1
 
 
 def get_missing_or_added_penalty(error_index: int) -> int:
+    """Return the score penalty for one missing or added character."""
     penalties = [10, 8, 6, 4]
-    if error_index < len(penalties):
-        return penalties[error_index]
-    return 2
+    return penalties[error_index] if error_index < len(penalties) else 2
+
+
+def find_single_substitution_index(
+    query: str,
+    sentence: str,
+    start: int,
+) -> int | None:
+    """Return the replacement index, or None when there is not one edit."""
+    mismatch_index: int | None = None
+
+    for index, query_character in enumerate(query):
+        if query_character != sentence[start + index]:
+            if mismatch_index is not None:
+                return None
+            mismatch_index = index
+
+    return mismatch_index
+
+
+def find_query_extra_character_index(
+    query: str,
+    sentence: str,
+    start: int,
+) -> int | None:
+    """Return the index of one character that can be removed from query."""
+    sentence_index = 0
+    query_length = len(query)
+
+    while (
+        sentence_index < query_length - 1
+        and query[sentence_index] == sentence[start + sentence_index]
+    ):
+        sentence_index += 1
+
+    if sentence_index == query_length - 1:
+        return query_length - 1
+
+    query_index = sentence_index + 1
+    while query_index < query_length:
+        if query[query_index] != sentence[start + query_index - 1]:
+            return None
+        query_index += 1
+
+    return sentence_index
+
+
+def find_sentence_extra_character_index(
+    query: str,
+    sentence: str,
+    start: int,
+) -> int | None:
+    """Return the index of one character that can be removed from sentence."""
+    query_index = 0
+    query_length = len(query)
+
+    while (
+        query_index < query_length
+        and query[query_index] == sentence[start + query_index]
+    ):
+        query_index += 1
+
+    if query_index == query_length:
+        return query_length
+
+    sentence_index = query_index + 1
+    while sentence_index <= query_length:
+        if query[sentence_index - 1] != sentence[start + sentence_index]:
+            return None
+        sentence_index += 1
+
+    return query_index
 
 
 def calculate_best_match(query: str, sentence: str) -> int | None:
-    norm_query = normalize(query)
-    norm_sentence = normalize(sentence)
+    """Score a query against one sentence, allowing at most one edit."""
+    normalized_query = normalize(query)
+    normalized_sentence = normalize(sentence)
 
-    if not norm_query or not norm_sentence:
+    if not normalized_query or not normalized_sentence:
         return None
 
-    n = len(norm_query)
+    query_length = len(normalized_query)
 
-    # Option 1: Exact match
-    if norm_query in norm_sentence:
-        return n * 2
+    if normalized_query in normalized_sentence:
+        return query_length * 2
 
-    best_score = None
+    best_score: int | None = None
 
-    # Option 2: Substitution (same length match with 1 character difference)
-    for i in range(len(norm_sentence) - n + 1):
-        sub = norm_sentence[i : i + n]
-        mismatches = [idx for idx in range(n) if norm_query[idx] != sub[idx]]
+    # One substituted character. The comparison stops as soon as it finds a
+    # second mismatch, without allocating a substring for every window.
+    for start in range(len(normalized_sentence) - query_length + 1):
+        mismatch_index = find_single_substitution_index(
+            normalized_query,
+            normalized_sentence,
+            start,
+        )
+        if mismatch_index is not None:
+            score = query_length * 2 - get_substitution_penalty(mismatch_index)
+            best_score = score if best_score is None else max(best_score, score)
 
-        if len(mismatches) == 1:
-            err_idx = mismatches[0]
-            score = (n * 2) - get_substitution_penalty(err_idx)
-            if best_score is None or score > best_score:
-                best_score = score
+    # One extra character in the query.
+    if query_length > 1:
+        for start in range(len(normalized_sentence) - query_length + 2):
+            extra_index = find_query_extra_character_index(
+                normalized_query,
+                normalized_sentence,
+                start,
+            )
+            if extra_index is not None:
+                score = (query_length - 1) * 2 - get_missing_or_added_penalty(extra_index)
+                best_score = score if best_score is None else max(best_score, score)
 
-    # Option 3: Character added in query (query is 1 character longer)
-    if n > 1:
-        for i in range(len(norm_sentence) - (n - 1) + 1):
-            sub = norm_sentence[i : i + n - 1]
-            for idx in range(n):
-                # Remove 1 character from query at idx and compare with sub
-                modified_query = norm_query[:idx] + norm_query[idx + 1 :]
-                if modified_query == sub:
-                    # Matched characters in sentence is n - 1
-                    base_score = (n - 1) * 2
-                    score = base_score - get_missing_or_added_penalty(idx)
-                    if best_score is None or score > best_score:
-                        best_score = score
-
-    # Option 4: Character missing in query (query is 1 character shorter)
-    for i in range(len(norm_sentence) - (n + 1) + 1):
-        sub = norm_sentence[i : i + n + 1]
-        for idx in range(n + 1):
-            # Remove 1 character from sentence window at idx and compare with query
-            modified_sub = sub[:idx] + sub[idx + 1 :]
-            if norm_query == modified_sub:
-                base_score = n * 2
-                score = base_score - get_missing_or_added_penalty(idx)
-                if best_score is None or score > best_score:
-                    best_score = score
+    # One missing character in the query.
+    for start in range(len(normalized_sentence) - query_length):
+        extra_index = find_sentence_extra_character_index(
+            normalized_query,
+            normalized_sentence,
+            start,
+        )
+        if extra_index is not None:
+            score = query_length * 2 - get_missing_or_added_penalty(extra_index)
+            best_score = score if best_score is None else max(best_score, score)
 
     return best_score
