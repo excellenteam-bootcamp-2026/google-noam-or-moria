@@ -8,6 +8,7 @@ from .models import SearchData, SentenceData
 
 CORPUS_PATH_ENV = "GOOGLE_AUTOCOMPLETE_CORPUS"
 DEFAULT_CORPUS_PATH = Path.home() / "OneDrive" / "מסמכים" / "Archive (1)"
+MAX_FUZZY_GRAMS = 10
 
 
 def create_ngrams(text: str, n: int) -> set[str]:
@@ -84,6 +85,9 @@ def find_exact_candidate_ids(
         for gram in create_ngrams(normalized_query, 3)
     ]
 
+    if not posting_lists or any(not posting for posting in posting_lists):
+        return set()
+
     smallest_posting = min(posting_lists, key=len)
     return set(smallest_posting)
 
@@ -114,15 +118,25 @@ def find_candidate_ids(
         index = search_data.trigram_index
 
     query_ngrams = create_ngrams(normalized_query, n)
+    selected_grams = query_ngrams
+
+    if n == 3:
+        selected_grams = set(
+            sorted(
+                query_ngrams,
+                key=lambda gram: len(index.get(gram, [])),
+            )[:MAX_FUZZY_GRAMS]
+        )
+
     match_counts: Counter[int] = Counter()
 
-    for gram in query_ngrams:
+    for gram in selected_grams:
         for sentence_id in index.get(gram, []):
             match_counts[sentence_id] += 1
 
     # One edit can affect at most ``n`` adjacent N-grams. Requiring all other
     # grams greatly reduces false candidates without excluding one-edit matches.
-    minimum_shared = max(1, len(query_ngrams) - n)
+    minimum_shared = max(1, len(selected_grams) - n)
 
     return {
         sentence_id

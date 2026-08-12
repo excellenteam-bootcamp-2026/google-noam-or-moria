@@ -178,6 +178,41 @@ class FindCandidateIdsTests(TestCase):
 
         self.assertEqual(find_candidate_ids("progranming", search_data), {0})
 
+    def test_added_character_in_long_query_keeps_correct_sentence(self) -> None:
+        search_data = build_search_data(
+            [make_sentence(0, "abcdefghijklmnop")]
+        )
+
+        self.assertEqual(
+            find_candidate_ids("abcdefxghijklmnop", search_data),
+            {0},
+        )
+
+    def test_missing_character_in_long_query_keeps_correct_sentence(self) -> None:
+        search_data = build_search_data(
+            [make_sentence(0, "abcdefghijklmnop")]
+        )
+
+        self.assertEqual(
+            find_candidate_ids("abcdefhijklmnop", search_data),
+            {0},
+        )
+
+    def test_long_fuzzy_query_uses_only_rarest_trigrams(self) -> None:
+        correct_text = "abcdefghijklmnop"
+        search_data = build_search_data(
+            [
+                make_sentence(0, correct_text),
+                make_sentence(1, "abc bcd cde def efgh common fragments"),
+                make_sentence(2, "unrelated sentence"),
+            ]
+        )
+
+        candidates = find_candidate_ids(correct_text, search_data)
+
+        self.assertIn(0, candidates)
+        self.assertNotIn(2, candidates)
+
     def test_repeated_character_query_does_not_duplicate_candidate_count(self) -> None:
         search_data = build_search_data(
             [
