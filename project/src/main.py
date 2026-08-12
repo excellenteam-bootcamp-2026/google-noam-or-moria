@@ -1,7 +1,6 @@
 """Command-line interface for the autocomplete project."""
 
-from src.autocomplete import select_indexed_completions
-from src.models import SearchData
+from src.autocomplete import get_best_k_completions, initialize
 
 
 def update_query(current_query: str, typed_text: str) -> str:
@@ -13,10 +12,10 @@ def update_query(current_query: str, typed_text: str) -> str:
     return current_query + typed_text
 
 
-def print_completions(query: str, search_data: SearchData) -> None:
+def print_completions(query: str) -> None:
     """Print the best completions for the current query."""
 
-    completions = select_indexed_completions(query, search_data)
+    completions = get_best_k_completions(query)
     if not completions:
         print("No suggestions found.")
         return
@@ -30,13 +29,10 @@ def print_completions(query: str, search_data: SearchData) -> None:
         )
 
 
-def run_cli(root_path: str) -> None:
+def run_cli(root_path: str | None = None) -> None:
     """Load the data and run the interactive autocomplete prompt."""
 
-    # Imported here because the indexer is supplied by Or's branch.
-    from src.indexer import initialize
-
-    search_data = initialize(root_path)
+    initialize(root_path)
     current_query = ""
 
     print("The system is ready. Enter your text:")
@@ -49,13 +45,17 @@ def run_cli(root_path: str) -> None:
 
         current_query = update_query(current_query, typed_text)
         if current_query:
-            print_completions(current_query, search_data)
+            print_completions(current_query)
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Sentence autocomplete")
-    parser.add_argument("root_path", help="Root folder containing text files")
+    parser.add_argument(
+        "root_path",
+        nargs="?",
+        help="Root folder containing text files",
+    )
     arguments = parser.parse_args()
     run_cli(arguments.root_path)
