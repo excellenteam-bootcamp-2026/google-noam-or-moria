@@ -33,6 +33,17 @@ class CreateNGramsTests(TestCase):
         with self.assertRaises(ValueError):
             create_ngrams("text", 0)
 
+    def test_repeated_characters_create_one_unique_ngram(self) -> None:
+        self.assertEqual(create_ngrams("aaaaaaaa", 3), {"aaa"})
+
+    def test_repeated_phrase_keeps_unique_ngrams(self) -> None:
+        grams = create_ngrams("banana banana", 3)
+
+        self.assertEqual(
+            grams,
+            {"ban", "ana", "nan", "na ", "a b", " ba"},
+        )
+
 
 class BuildSearchDataTests(TestCase):
     def test_builds_all_indexes_and_sentence_lookup(self) -> None:
@@ -139,6 +150,31 @@ class FindCandidateIdsTests(TestCase):
 
         self.assertEqual(find_candidate_ids("progranming", search_data), {0})
 
+    def test_repeated_character_query_does_not_duplicate_candidate_count(self) -> None:
+        search_data = build_search_data(
+            [
+                make_sentence(0, "aaaaaaaa"),
+                make_sentence(1, "contains aaa once"),
+                make_sentence(2, "unrelated sentence"),
+            ]
+        )
+
+        self.assertEqual(find_candidate_ids("aaaaaaaa", search_data), {0, 1})
+
+    def test_repeated_phrase_query_keeps_matching_sentence(self) -> None:
+        search_data = build_search_data(
+            [
+                make_sentence(0, "banana banana smoothie"),
+                make_sentence(1, "banana bread"),
+                make_sentence(2, "unrelated sentence"),
+            ]
+        )
+
+        candidates = find_candidate_ids("banana banana", search_data)
+
+        self.assertIn(0, candidates)
+        self.assertNotIn(2, candidates)
+
 
 class FindExactCandidateIdsTests(TestCase):
     def setUp(self) -> None:
@@ -176,5 +212,34 @@ class FindExactCandidateIdsTests(TestCase):
     def test_long_query_does_not_scan_unrelated_sentences(self) -> None:
         self.assertEqual(
             find_exact_candidate_ids("catalog", self.search_data),
+            {0},
+        )
+
+    def test_repeated_character_exact_query_returns_strong_candidates(self) -> None:
+        search_data = build_search_data(
+            [
+                make_sentence(0, "aaaaaaaa"),
+                make_sentence(1, "contains aaa once"),
+                make_sentence(2, "unrelated sentence"),
+            ]
+        )
+
+        # The index only produces candidates. The matcher must still verify
+        # repetitions, order, and an actual exact substring match.
+        self.assertEqual(
+            find_exact_candidate_ids("aaaaaaaa", search_data),
+            {0, 1},
+        )
+
+    def test_repeated_phrase_exact_query_keeps_correct_candidate(self) -> None:
+        search_data = build_search_data(
+            [
+                make_sentence(0, "banana banana smoothie"),
+                make_sentence(1, "banana bread"),
+            ]
+        )
+
+        self.assertEqual(
+            find_exact_candidate_ids("banana banana", search_data),
             {0},
         )
