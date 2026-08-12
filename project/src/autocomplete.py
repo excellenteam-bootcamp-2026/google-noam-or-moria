@@ -2,73 +2,38 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from heapq import nsmallest
 
 from src.matcher import calculate_best_match
-from src.models import AutoCompleteData, SearchData, SentenceData
+from src.models import AutoCompleteData, SearchData
 
 
-_sentences: list[SentenceData] = []
+_search_data: SearchData | None = None
 
 
-def set_sentences(sentences: Iterable[SentenceData]) -> None:
-    """Replace the sentences used by the public completion function.
+def initialize(root_path: str | None = None) -> None:
+    """Build and store all data required by the online completion function."""
 
-    This small function keeps the online completion API independent from the
-    offline loader and also makes the module easy to test.
-    """
+    from src.indexer import initialize as build_search_data
 
-    global _sentences
-    _sentences = list(sentences)
+    set_search_data(build_search_data(root_path))
 
 
-def select_best_completions(
-    query: str,
-    sentences: Iterable[SentenceData],
-    k: int = 5,
-) -> list[AutoCompleteData]:
-    """Return up to ``k`` highest-scoring completions for ``query``.
+def set_search_data(search_data: SearchData) -> None:
+    """Store the data prepared by the offline initialization stage."""
 
-    The matcher owns normalization and score calculation.  This function owns
-    filtering, conversion to the required output model, and deterministic
-    ordering.
-    """
-
-    if k <= 0 or not query:
-        return []
-
-    matches: list[AutoCompleteData] = []
-    for sentence in sentences:
-        score = calculate_best_match(query, sentence.normalized_sentence)
-        if score is None:
-            continue
-
-        matches.append(
-            AutoCompleteData(
-                completed_sentence=sentence.original_sentence,
-                source_text=sentence.source_path,
-                offset=sentence.offset,
-                score=score,
-            )
-        )
-
-    matches.sort(
-        key=lambda result: (
-            -result.score,
-            result.completed_sentence.casefold(),
-            result.completed_sentence,
-            result.source_text,
-            result.offset,
-        )
-    )
-    return matches[:k]
+    global _search_data
+    _search_data = search_data
 
 
 def get_best_k_completions(prefix: str) -> list[AutoCompleteData]:
-    """Return the five best completions from the initialized sentence data."""
+    """Return the five best completions from the initialized search index."""
 
-    return select_best_completions(prefix, _sentences, k=5)
+    if _search_data is None:
+        raise RuntimeError("Autocomplete data has not been initialized")
+
+    return select_indexed_completions(prefix, _search_data, k=5)
 
 
 def build_best_completions(

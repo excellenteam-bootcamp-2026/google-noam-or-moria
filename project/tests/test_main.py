@@ -1,11 +1,7 @@
 from unittest.mock import patch
 
 from src.main import print_completions, update_query
-from src.models import AutoCompleteData, SearchData
-
-
-def empty_search_data() -> SearchData:
-    return SearchData({}, {}, {}, {})
+from src.models import AutoCompleteData
 
 
 def test_typing_continues_the_previous_query() -> None:
@@ -29,10 +25,10 @@ def test_prints_all_required_completion_fields(capsys) -> None:
     )
 
     with patch(
-        "src.main.select_indexed_completions",
+        "src.main.get_best_k_completions",
         return_value=[completion],
     ):
-        print_completions("cat", empty_search_data())
+        print_completions("cat")
 
     output = capsys.readouterr().out
     assert "The cat sleeps." in output
@@ -42,7 +38,7 @@ def test_prints_all_required_completion_fields(capsys) -> None:
 
 
 def test_prints_message_when_there_are_no_suggestions(capsys) -> None:
-    with patch("src.main.select_indexed_completions", return_value=[]):
-        print_completions("missing", empty_search_data())
+    with patch("src.main.get_best_k_completions", return_value=[]):
+        print_completions("missing")
 
     assert capsys.readouterr().out == "No suggestions found.\n"
