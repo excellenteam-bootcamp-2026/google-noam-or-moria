@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x63orpus.proto\x12\x13google_autocomplete\"\x82\x01\n\x0eSentenceRecord\x12\x13\n\x0bsentence_id\x18\x01 \x01(\r\x12\x19\n\x11original_sentence\x18\x02 \x01(\t\x12\x1b\n\x13normalized_sentence\x18\x03 \x01(\t\x12\x13\n\x0bsource_path\x18\x04 \x01(\t\x12\x0e\n\x06offset\x18\x05 \x01(\r\"s\n\x0b\x43orpusChunk\x12\x16\n\x0e\x66ormat_version\x18\x01 \x01(\r\x12\x14\n\x0c\x63hunk_number\x18\x02 \x01(\r\x12\x36\n\tsentences\x18\x03 \x03(\x0b\x32#.google_autocomplete.SentenceRecordb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x63orpus.proto\x12\x13google_autocomplete\"\x9f\x01\n\x0eSentenceRecord\x12\x13\n\x0bsentence_id\x18\x01 \x01(\r\x12\x19\n\x11original_sentence\x18\x02 \x01(\t\x12\x1b\n\x13normalized_sentence\x18\x03 \x01(\t\x12\x13\n\x0bsource_path\x18\x04 \x01(\t\x12\x0e\n\x06offset\x18\x05 \x01(\r\x12\x1b\n\x13\x63\x61sefolded_sentence\x18\x06 \x01(\t\"s\n\x0b\x43orpusChunk\x12\x16\n\x0e\x66ormat_version\x18\x01 \x01(\r\x12\x14\n\x0c\x63hunk_number\x18\x02 \x01(\r\x12\x36\n\tsentences\x18\x03 \x03(\x0b\x32#.google_autocomplete.SentenceRecordb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,7 +32,7 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'corpus_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_SENTENCERECORD']._serialized_start=38
-  _globals['_SENTENCERECORD']._serialized_end=168
-  _globals['_CORPUSCHUNK']._serialized_start=170
-  _globals['_CORPUSCHUNK']._serialized_end=285
+  _globals['_SENTENCERECORD']._serialized_end=197
+  _globals['_CORPUSCHUNK']._serialized_start=199
+  _globals['_CORPUSCHUNK']._serialized_end=314
 # @@protoc_insertion_point(module_scope)

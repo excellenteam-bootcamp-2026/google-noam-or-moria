@@ -12,7 +12,7 @@ from src.models import SearchData, SentenceData
 DEFAULT_LIBRARY_PATH = (
     Path(__file__).resolve().parents[1]
     / "native"
-    / "build"
+    / "build-protobuf"
     / "Release"
     / "autocomplete_native.dll"
 )
@@ -53,6 +53,22 @@ class NativeIndex:
             raise
         return engine
 
+    @classmethod
+    def from_protobuf_directory(
+        cls,
+        directory: str | Path,
+        library_path: str | Path | None = None,
+    ) -> "NativeIndex":
+        engine = cls(library_path)
+        loaded = engine._library.autocomplete_engine_load_corpus_directory(
+            engine._handle,
+            str(Path(directory)).encode("utf-8"),
+        )
+        if not loaded:
+            engine.close()
+            engine._raise_last_error("Could not load Protobuf corpus")
+        return engine
+
     def _configure_signatures(self) -> None:
         uint32_pointer = ctypes.POINTER(ctypes.c_uint32)
 
@@ -67,6 +83,23 @@ class NativeIndex:
             ctypes.c_char_p,
         ]
         self._library.autocomplete_engine_add_sentence.restype = ctypes.c_int
+        self._library.autocomplete_engine_add_sentence_full.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_uint32,
+            ctypes.c_char_p,
+        ]
+        self._library.autocomplete_engine_add_sentence_full.restype = ctypes.c_int
+        self._library.autocomplete_engine_load_corpus_directory.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+        ]
+        self._library.autocomplete_engine_load_corpus_directory.restype = ctypes.c_int
+        self._library.autocomplete_engine_sentence_count.argtypes = [ctypes.c_void_p]
+        self._library.autocomplete_engine_sentence_count.restype = ctypes.c_size_t
         self._library.autocomplete_engine_find_exact_top_k.argtypes = [
             ctypes.c_void_p,
             ctypes.c_char_p,
@@ -82,6 +115,19 @@ class NativeIndex:
         self._library.autocomplete_engine_find_fuzzy_candidates.restype = ctypes.c_size_t
         self._library.autocomplete_engine_free_ids.argtypes = [uint32_pointer]
         self._library.autocomplete_engine_free_ids.restype = None
+        for name in (
+            "autocomplete_engine_sentence_original",
+            "autocomplete_engine_sentence_normalized",
+            "autocomplete_engine_sentence_source",
+        ):
+            function = getattr(self._library, name)
+            function.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+            function.restype = ctypes.c_char_p
+        self._library.autocomplete_engine_sentence_offset.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+        ]
+        self._library.autocomplete_engine_sentence_offset.restype = ctypes.c_uint32
         self._library.autocomplete_engine_last_error.argtypes = []
         self._library.autocomplete_engine_last_error.restype = ctypes.c_char_p
 
@@ -93,10 +139,13 @@ class NativeIndex:
     def add_sentences(self, sentences: Iterable[SentenceData]) -> None:
         self._ensure_open()
         for sentence in sentences:
-            added = self._library.autocomplete_engine_add_sentence(
+            added = self._library.autocomplete_engine_add_sentence_full(
                 self._handle,
                 sentence.sentence_id,
+                sentence.original_sentence.encode("utf-8"),
                 sentence.normalized_sentence.encode("utf-8"),
+                sentence.source_path.encode("utf-8"),
+                sentence.offset,
                 self._sort_key(sentence).encode("utf-8"),
             )
             if not added:
@@ -108,15 +157,7 @@ class NativeIndex:
     def _sort_key(sentence: SentenceData) -> str:
         """Match the complete deterministic ordering used by Python."""
 
-        separator = "\x1f"
-        return separator.join(
-            (
-                sentence.original_sentence.casefold(),
-                sentence.original_sentence,
-                sentence.source_path,
-                f"{sentence.offset:020d}",
-            )
-        )
+        return sentence.original_sentence.casefold()
 
     def find_exact_top_k(self, normalized_query: str, k: int = 5) -> list[int]:
         self._ensure_open()
@@ -132,6 +173,33 @@ class NativeIndex:
         )
         self._check_error()
         return list(output[:count])
+
+    def __len__(self) -> int:
+        self._ensure_open()
+        count = self._library.autocomplete_engine_sentence_count(self._handle)
+        self._check_error()
+        return count
+
+    def get_sentence(self, sentence_id: int) -> SentenceData:
+        """Copy one result record from native memory into the public model."""
+
+        self._ensure_open()
+        values = []
+        for name in (
+            "autocomplete_engine_sentence_original",
+            "autocomplete_engine_sentence_normalized",
+            "autocomplete_engine_sentence_source",
+        ):
+            encoded = getattr(self._library, name)(self._handle, sentence_id)
+            if encoded is None:
+                self._raise_last_error(f"Unknown sentence ID: {sentence_id}")
+            values.append(encoded.decode("utf-8"))
+        offset = self._library.autocomplete_engine_sentence_offset(
+            self._handle,
+            sentence_id,
+        )
+        self._check_error()
+        return SentenceData(sentence_id, values[0], values[1], values[2], offset)
 
     def find_fuzzy_candidate_ids(self, normalized_query: str) -> set[int]:
         self._ensure_open()

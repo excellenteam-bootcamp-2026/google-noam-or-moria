@@ -85,7 +85,6 @@ def main() -> None:
             native_results, native_seconds = measure(
                 lambda: select_native_completions(
                     query,
-                    metadata,
                     native_index,
                 )
             )

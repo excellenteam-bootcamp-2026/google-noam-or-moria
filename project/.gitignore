@@ -11,7 +11,7 @@ __pycache__/
 .idea/
 
 # Native build output
-native/build/
+native/build*/
 vcpkg_installed/
 
 # Generated corpus data

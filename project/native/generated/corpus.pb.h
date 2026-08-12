@@ -219,6 +219,7 @@ class SentenceRecord final : public ::google::protobuf::Message
     kOriginalSentenceFieldNumber = 2,
     kNormalizedSentenceFieldNumber = 3,
     kSourcePathFieldNumber = 4,
+    kCasefoldedSentenceFieldNumber = 6,
     kSentenceIdFieldNumber = 1,
     kOffsetFieldNumber = 5,
   };
@@ -267,6 +268,21 @@ class SentenceRecord final : public ::google::protobuf::Message
   ::std::string* PROTOBUF_NONNULL _internal_mutable_source_path();
 
   public:
+  // string casefolded_sentence = 6;
+  void clear_casefolded_sentence() ;
+  const ::std::string& casefolded_sentence() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_casefolded_sentence(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_casefolded_sentence();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_casefolded_sentence();
+  void set_allocated_casefolded_sentence(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_casefolded_sentence() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_casefolded_sentence(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_casefolded_sentence();
+
+  public:
   // uint32 sentence_id = 1;
   void clear_sentence_id() ;
   ::uint32_t sentence_id() const;
@@ -291,8 +307,8 @@ class SentenceRecord final : public ::google::protobuf::Message
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 5,
-                                   0, 90,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
+                                   0, 109,
                                    2>
       _table_;
 
@@ -316,6 +332,7 @@ class SentenceRecord final : public ::google::protobuf::Message
     ::google::protobuf::internal::ArenaStringPtr original_sentence_;
     ::google::protobuf::internal::ArenaStringPtr normalized_sentence_;
     ::google::protobuf::internal::ArenaStringPtr source_path_;
+    ::google::protobuf::internal::ArenaStringPtr casefolded_sentence_;
     ::uint32_t sentence_id_;
     ::uint32_t offset_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -568,7 +585,7 @@ inline void SentenceRecord::clear_sentence_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sentence_id_ = 0u;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000010U);
 }
 inline ::uint32_t SentenceRecord::sentence_id() const {
   // @@protoc_insertion_point(field_get:google_autocomplete.SentenceRecord.sentence_id)
@@ -576,7 +593,7 @@ inline ::uint32_t SentenceRecord::sentence_id() const {
 }
 inline void SentenceRecord::set_sentence_id(::uint32_t value) {
   _internal_set_sentence_id(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:google_autocomplete.SentenceRecord.sentence_id)
 }
 inline ::uint32_t SentenceRecord::_internal_sentence_id() const {
@@ -788,7 +805,7 @@ inline void SentenceRecord::clear_offset() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.offset_ = 0u;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000020U);
 }
 inline ::uint32_t SentenceRecord::offset() const {
   // @@protoc_insertion_point(field_get:google_autocomplete.SentenceRecord.offset)
@@ -796,7 +813,7 @@ inline ::uint32_t SentenceRecord::offset() const {
 }
 inline void SentenceRecord::set_offset(::uint32_t value) {
   _internal_set_offset(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:google_autocomplete.SentenceRecord.offset)
 }
 inline ::uint32_t SentenceRecord::_internal_offset() const {
@@ -806,6 +823,71 @@ inline ::uint32_t SentenceRecord::_internal_offset() const {
 inline void SentenceRecord::_internal_set_offset(::uint32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.offset_ = value;
+}
+
+// string casefolded_sentence = 6;
+inline void SentenceRecord::clear_casefolded_sentence() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.casefolded_sentence_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::std::string& SentenceRecord::casefolded_sentence() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:google_autocomplete.SentenceRecord.casefolded_sentence)
+  return _internal_casefolded_sentence();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SentenceRecord::set_casefolded_sentence(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.casefolded_sentence_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:google_autocomplete.SentenceRecord.casefolded_sentence)
+}
+inline ::std::string* PROTOBUF_NONNULL SentenceRecord::mutable_casefolded_sentence()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_casefolded_sentence();
+  // @@protoc_insertion_point(field_mutable:google_autocomplete.SentenceRecord.casefolded_sentence)
+  return _s;
+}
+inline const ::std::string& SentenceRecord::_internal_casefolded_sentence() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.casefolded_sentence_.Get();
+}
+inline void SentenceRecord::_internal_set_casefolded_sentence(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.casefolded_sentence_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SentenceRecord::_internal_mutable_casefolded_sentence() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.casefolded_sentence_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SentenceRecord::release_casefolded_sentence() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:google_autocomplete.SentenceRecord.casefolded_sentence)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.casefolded_sentence_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.casefolded_sentence_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SentenceRecord::set_allocated_casefolded_sentence(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.casefolded_sentence_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.casefolded_sentence_.IsDefault()) {
+    _impl_.casefolded_sentence_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:google_autocomplete.SentenceRecord.casefolded_sentence)
 }
 
 // -------------------------------------------------------------------

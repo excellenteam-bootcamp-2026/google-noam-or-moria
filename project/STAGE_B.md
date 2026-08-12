@@ -48,27 +48,28 @@ for the large-data requirement in the next Stage B tasks.
 
 ## Environment requirement
 
-Visual Studio Community is installed, but its C++ compiler is not currently
-installed. Add the **Desktop development with C++** workload in Visual Studio
-Installer before compiling the native component. The workload should include:
+Visual Studio Community with the **Desktop development with C++** workload is
+required. The workload should include:
 
 - MSVC x64/x86 build tools
 - Windows SDK
 - CMake tools for Windows
 
-The Protocol Buffer compiler/runtime will be configured after the native
-compiler is available.
+The current development machine uses MSVC 19.51 and Windows SDK 10.0.26100.
 
 ## Native prototype results
 
 The first native implementation is in `native/`. It is a C++17 DLL loaded by
-Python with `ctypes`, so the Python public API and CLI remain unchanged. Build
-it from the `project` directory with:
+Python with `ctypes`, so the Python public API and CLI remain unchanged.
+Install dependencies into an ASCII-only cache path (some Windows linker tools
+do not handle the Hebrew parent directory correctly), then build:
 
 ```powershell
-cmake -S native -B native/build -A x64
-cmake --build native/build --config Release
-cmake --build native/build --config Release --target RUN_TESTS
+vcpkg install --x-manifest-root=. --x-install-root=C:\vcpkg-google
+cmake -S native -B native/build-protobuf -A x64 `
+  -DCMAKE_PREFIX_PATH=C:\vcpkg-google\x64-windows
+cmake --build native/build-protobuf --config Release
+cmake --build native/build-protobuf --config Release --target RUN_TESTS
 ```
 
 Run the CLI with the native index:
@@ -90,12 +91,10 @@ of 100,000 real sentences, the first comparison produced:
 | Ten-word query with an early typo | 0.142 ms | 0.061 ms | 2.3x |
 
 Every native result was identical to the Python result in this comparison.
-The C++ unit test and all 55 discoverable Python unit tests also pass.
+The C++ unit test and all Python unit tests also pass.
 
-In native mode Python keeps sentence metadata for the required output, but it
-does not build duplicate Python N-gram indexes. The next step is Protocol
-Buffers, allowing the C++ engine to load records directly and avoiding the
-per-sentence Python-to-C++ initialization boundary.
+In native text mode Python keeps sentence metadata for the required output,
+but it does not build duplicate Python N-gram indexes.
 
 ## Protocol Buffers and full-corpus conversion
 
@@ -114,12 +113,44 @@ The supplied full archive was converted and read back successfully:
 |---|---:|
 | Source sentences | 2,583,987 |
 | Protobuf chunks | 52 |
-| Total Protobuf size | 448.5 MiB |
-| Streaming conversion time | 78.884 s |
+| Total Protobuf size | 565.2 MiB |
+| Streaming conversion time | 21.096 s |
 | Full sequential read time | 10.180 s |
 | First / last sentence ID | 0 / 2,583,986 |
 
 The chunk design avoids the Protocol Buffer size limit of one enormous
 message, permits sequential loading, and bounds temporary conversion memory.
-All 59 discoverable Python tests pass, including multi-chunk round-trip and
-overwrite-protection tests.
+All 76 `pytest` tests pass, including multi-chunk round-trip,
+overwrite-protection, and direct C++ loading tests.
+
+### Direct C++ loading
+
+The final native path does not load text files or construct Python indexes.
+After conversion, run:
+
+```powershell
+python -m src.main --protobuf C:\path\to\protobuf-chunks
+```
+
+The optimized schema stores one case-folded sentence for deterministic sorting
+instead of duplicating a compound key. This reduced an experimental 938.6 MiB
+encoding to 565.2 MiB.
+
+The direct C++ benchmark (`profiling/benchmark_protobuf_native.py`) produced:
+
+| Measurement | Python baseline | C++ + Protobuf | Improvement |
+|---|---:|---:|---:|
+| Load and index | 52.242 s | 21.918 s | 2.4x |
+| Added working-set memory | 2,539.6 MiB | 2,119.8 MiB | 16.5% less |
+| Query `a` | 615.989 ms | 218.187 ms | 2.8x |
+| Query `th` | 367.308 ms | 142.196 ms | 2.6x |
+| Query `the` | 309.615 ms | 120.271 ms | 2.6x |
+| Ten-word exact query | 22.127 ms | 7.186 ms | 3.1x |
+| Early typo | 17.267 ms | 4.052 ms | 4.3x |
+| Final typo | 21.747 ms | 4.545 ms | 4.8x |
+| Absent long query | 5.444 ms | 0.944 ms | 5.8x |
+
+C++ validates the format version and sequential chunk numbers while reading,
+builds the indexes directly, and retains all metadata required for the final
+`AutoCompleteData`. Python receives only candidate records needed for scoring
+and display.

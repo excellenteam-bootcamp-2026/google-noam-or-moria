@@ -1,8 +1,11 @@
 #include "autocomplete_engine.h"
+#include "corpus.pb.h"
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <queue>
 #include <stdexcept>
@@ -19,7 +22,10 @@ thread_local std::string last_error;
 
 struct Sentence {
     std::uint32_t id;
+    std::string original;
     std::string normalized;
+    std::string source;
+    std::uint32_t offset;
     std::string sort_key;
 };
 
@@ -43,7 +49,10 @@ class Engine {
 public:
     void add_sentence(
         std::uint32_t id,
+        std::string original,
         std::string normalized,
+        std::string source,
+        std::uint32_t offset,
         std::string sort_key
     ) {
         if (position_by_id_.find(id) != position_by_id_.end()) {
@@ -51,12 +60,71 @@ public:
         }
 
         position_by_id_[id] = sentences_.size();
-        sentences_.push_back({id, std::move(normalized), std::move(sort_key)});
+        sentences_.push_back({
+            id,
+            std::move(original),
+            std::move(normalized),
+            std::move(source),
+            offset,
+            std::move(sort_key),
+        });
         const std::string& text = sentences_.back().normalized;
 
         add_to_index(unigram_index_, text, 1, id);
         add_to_index(bigram_index_, text, 2, id);
         add_to_index(trigram_index_, text, 3, id);
+    }
+
+    void load_corpus_directory(const std::filesystem::path& directory) {
+        if (!std::filesystem::is_directory(directory)) {
+            throw std::invalid_argument("protobuf corpus directory does not exist");
+        }
+
+        std::vector<std::filesystem::path> chunk_paths;
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            const std::string filename = entry.path().filename().string();
+            if (entry.is_regular_file() &&
+                filename.rfind("corpus-", 0) == 0 &&
+                entry.path().extension() == ".pb") {
+                chunk_paths.push_back(entry.path());
+            }
+        }
+        std::sort(chunk_paths.begin(), chunk_paths.end());
+
+        for (std::size_t expected = 0; expected < chunk_paths.size(); ++expected) {
+            std::ifstream input(chunk_paths[expected], std::ios::binary);
+            google_autocomplete::CorpusChunk chunk;
+            if (!input || !chunk.ParseFromIstream(&input)) {
+                throw std::runtime_error("could not parse protobuf corpus chunk");
+            }
+            if (chunk.format_version() != 1) {
+                throw std::runtime_error("unsupported protobuf corpus version");
+            }
+            if (chunk.chunk_number() != expected) {
+                throw std::runtime_error("protobuf corpus chunk sequence is invalid");
+            }
+
+            for (const auto& record : chunk.sentences()) {
+                add_sentence(
+                    record.sentence_id(),
+                    record.original_sentence(),
+                    record.normalized_sentence(),
+                    record.source_path(),
+                    record.offset(),
+                    record.casefolded_sentence().empty()
+                        ? record.original_sentence()
+                        : record.casefolded_sentence()
+                );
+            }
+        }
+    }
+
+    std::size_t sentence_count() const {
+        return sentences_.size();
+    }
+
+    const Sentence& sentence_by_id(std::uint32_t id) const {
+        return sentence(id);
     }
 
     std::vector<std::uint32_t> exact_top_k(
@@ -77,6 +145,15 @@ public:
             const Sentence& right_sentence = sentence(right);
             if (left_sentence.sort_key != right_sentence.sort_key) {
                 return left_sentence.sort_key < right_sentence.sort_key;
+            }
+            if (left_sentence.original != right_sentence.original) {
+                return left_sentence.original < right_sentence.original;
+            }
+            if (left_sentence.source != right_sentence.source) {
+                return left_sentence.source < right_sentence.source;
+            }
+            if (left_sentence.offset != right_sentence.offset) {
+                return left_sentence.offset < right_sentence.offset;
             }
             return left < right;
         };
@@ -271,12 +348,73 @@ int autocomplete_engine_add_sentence(
             }
             engine_from(handle).add_sentence(
                 sentence_id,
+                alphabetical_sort_key_utf8,
                 normalized_sentence_utf8,
+                "",
+                0,
                 alphabetical_sort_key_utf8
             );
             return 1;
         },
         0
+    );
+}
+
+int autocomplete_engine_add_sentence_full(
+    autocomplete_engine_handle handle,
+    std::uint32_t sentence_id,
+    const char* original_sentence_utf8,
+    const char* normalized_sentence_utf8,
+    const char* source_path_utf8,
+    std::uint32_t offset,
+    const char* alphabetical_sort_key_utf8
+) {
+    return protect(
+        [&]() {
+            if (original_sentence_utf8 == nullptr ||
+                normalized_sentence_utf8 == nullptr ||
+                source_path_utf8 == nullptr ||
+                alphabetical_sort_key_utf8 == nullptr) {
+                throw std::invalid_argument("sentence field is null");
+            }
+            engine_from(handle).add_sentence(
+                sentence_id,
+                original_sentence_utf8,
+                normalized_sentence_utf8,
+                source_path_utf8,
+                offset,
+                alphabetical_sort_key_utf8
+            );
+            return 1;
+        },
+        0
+    );
+}
+
+int autocomplete_engine_load_corpus_directory(
+    autocomplete_engine_handle handle,
+    const char* directory_path_utf8
+) {
+    return protect(
+        [&]() {
+            if (directory_path_utf8 == nullptr) {
+                throw std::invalid_argument("protobuf directory path is null");
+            }
+            engine_from(handle).load_corpus_directory(
+                std::filesystem::u8path(directory_path_utf8)
+            );
+            return 1;
+        },
+        0
+    );
+}
+
+std::size_t autocomplete_engine_sentence_count(
+    autocomplete_engine_handle handle
+) {
+    return protect(
+        [&]() { return engine_from(handle).sentence_count(); },
+        std::size_t{0}
     );
 }
 
@@ -335,6 +473,46 @@ std::size_t autocomplete_engine_find_fuzzy_candidates(
 
 void autocomplete_engine_free_ids(std::uint32_t* ids) {
     std::free(ids);
+}
+
+const char* autocomplete_engine_sentence_original(
+    autocomplete_engine_handle handle,
+    std::uint32_t sentence_id
+) {
+    return protect(
+        [&]() { return engine_from(handle).sentence_by_id(sentence_id).original.c_str(); },
+        static_cast<const char*>(nullptr)
+    );
+}
+
+const char* autocomplete_engine_sentence_normalized(
+    autocomplete_engine_handle handle,
+    std::uint32_t sentence_id
+) {
+    return protect(
+        [&]() { return engine_from(handle).sentence_by_id(sentence_id).normalized.c_str(); },
+        static_cast<const char*>(nullptr)
+    );
+}
+
+const char* autocomplete_engine_sentence_source(
+    autocomplete_engine_handle handle,
+    std::uint32_t sentence_id
+) {
+    return protect(
+        [&]() { return engine_from(handle).sentence_by_id(sentence_id).source.c_str(); },
+        static_cast<const char*>(nullptr)
+    );
+}
+
+std::uint32_t autocomplete_engine_sentence_offset(
+    autocomplete_engine_handle handle,
+    std::uint32_t sentence_id
+) {
+    return protect(
+        [&]() { return engine_from(handle).sentence_by_id(sentence_id).offset; },
+        std::uint32_t{0}
+    );
 }
 
 const char* autocomplete_engine_last_error() {

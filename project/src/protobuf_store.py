@@ -26,6 +26,7 @@ def _append_record(
     record.normalized_sentence = sentence.normalized_sentence
     record.source_path = sentence.source_path
     record.offset = sentence.offset
+    record.casefolded_sentence = sentence.original_sentence.casefold()
 
 
 def _write_chunk(

@@ -8,6 +8,7 @@ message SentenceRecord {
   string normalized_sentence = 3;
   string source_path = 4;
   uint32 offset = 5;
+  string casefolded_sentence = 6;
 }
 
 message CorpusChunk {

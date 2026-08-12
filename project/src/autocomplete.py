@@ -42,6 +42,19 @@ def initialize(root_path: str | None = None, use_native: bool = False) -> None:
     set_search_data(search_data)
 
 
+def initialize_from_protobuf(directory: str) -> None:
+    """Load chunked corpus data directly into the native C++ engine."""
+
+    from src.native_index import NativeIndex
+
+    global _native_index
+    if _native_index is not None:
+        _native_index.close()
+    _native_index = NativeIndex.from_protobuf_directory(directory)
+
+    set_search_data(SearchData({}, {}, {}, {}))
+
+
 def set_search_data(search_data: SearchData) -> None:
     """Store the data prepared by the offline initialization stage."""
 
@@ -56,14 +69,13 @@ def get_best_k_completions(prefix: str) -> list[AutoCompleteData]:
         raise RuntimeError("Autocomplete data has not been initialized")
 
     if _native_index is not None:
-        return select_native_completions(prefix, _search_data, _native_index, k=5)
+        return select_native_completions(prefix, _native_index, k=5)
 
     return select_indexed_completions(prefix, _search_data, k=5)
 
 
 def select_native_completions(
     query: str,
-    search_data: SearchData,
     native_index: object,
     k: int = 5,
 ) -> list[AutoCompleteData]:
@@ -79,17 +91,54 @@ def select_native_completions(
     exact_score = len(normalized_query) * 2
     exact_matches = {sentence_id: exact_score for sentence_id in exact_ids}
     if len(exact_matches) >= k:
-        return build_best_completions(exact_matches, search_data, k)
+        return build_native_completions(exact_matches, native_index, k)
 
     candidate_scores: dict[int, int | None] = dict(exact_matches)
     fuzzy_ids = native_index.find_fuzzy_candidate_ids(normalized_query)
     for sentence_id in fuzzy_ids - exact_matches.keys():
+        sentence = native_index.get_sentence(sentence_id)
         candidate_scores[sentence_id] = calculate_best_match(
             normalized_query,
-            search_data.sentences_by_id[sentence_id].normalized_sentence,
+            sentence.normalized_sentence,
         )
 
-    return build_best_completions(candidate_scores, search_data, k)
+    return build_native_completions(candidate_scores, native_index, k)
+
+
+def build_native_completions(
+    candidate_scores: Mapping[int, int | None],
+    native_index: object,
+    k: int = 5,
+) -> list[AutoCompleteData]:
+    """Build public results by copying only selected records from C++."""
+
+    if k <= 0:
+        return []
+
+    matches: list[AutoCompleteData] = []
+    for sentence_id, score in candidate_scores.items():
+        if score is None:
+            continue
+        sentence = native_index.get_sentence(sentence_id)
+        matches.append(
+            AutoCompleteData(
+                sentence.original_sentence,
+                sentence.source_path,
+                sentence.offset,
+                score,
+            )
+        )
+
+    matches.sort(
+        key=lambda result: (
+            -result.score,
+            result.completed_sentence.casefold(),
+            result.completed_sentence,
+            result.source_text,
+            result.offset,
+        )
+    )
+    return matches[:k]
 
 
 def build_best_completions(

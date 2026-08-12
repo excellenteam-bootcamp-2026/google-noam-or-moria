@@ -38,6 +38,9 @@ inline constexpr SentenceRecord::Impl_::Impl_(
         source_path_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        casefolded_sentence_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         sentence_id_{0u},
         offset_{0u} {}
 
@@ -97,17 +100,19 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_._has_bits_),
-        8, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_.sentence_id_),
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_.original_sentence_),
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_.normalized_sentence_),
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_.source_path_),
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_.offset_),
-        3,
+        PROTOBUF_FIELD_OFFSET(::google_autocomplete::SentenceRecord, _impl_.casefolded_sentence_),
+        4,
         0,
         1,
         2,
-        4,
+        5,
+        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::google_autocomplete::CorpusChunk, _impl_._has_bits_),
         6, // hasbit index offset
@@ -122,7 +127,7 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::google_autocomplete::SentenceRecord)},
-        {13, sizeof(::google_autocomplete::CorpusChunk)},
+        {15, sizeof(::google_autocomplete::CorpusChunk)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::google_autocomplete::_SentenceRecord_default_instance_._instance,
@@ -130,20 +135,21 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 };
 const char descriptor_table_protodef_corpus_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\014corpus.proto\022\023google_autocomplete\"\202\001\n\016"
+    "\n\014corpus.proto\022\023google_autocomplete\"\237\001\n\016"
     "SentenceRecord\022\023\n\013sentence_id\030\001 \001(\r\022\031\n\021o"
     "riginal_sentence\030\002 \001(\t\022\033\n\023normalized_sen"
     "tence\030\003 \001(\t\022\023\n\013source_path\030\004 \001(\t\022\016\n\006offs"
-    "et\030\005 \001(\r\"s\n\013CorpusChunk\022\026\n\016format_versio"
-    "n\030\001 \001(\r\022\024\n\014chunk_number\030\002 \001(\r\0226\n\tsentenc"
-    "es\030\003 \003(\0132#.google_autocomplete.SentenceR"
-    "ecordb\006proto3"
+    "et\030\005 \001(\r\022\033\n\023casefolded_sentence\030\006 \001(\t\"s\n"
+    "\013CorpusChunk\022\026\n\016format_version\030\001 \001(\r\022\024\n\014"
+    "chunk_number\030\002 \001(\r\0226\n\tsentences\030\003 \003(\0132#."
+    "google_autocomplete.SentenceRecordb\006prot"
+    "o3"
 };
 static ::absl::once_flag descriptor_table_corpus_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_corpus_2eproto = {
     false,
     false,
-    293,
+    322,
     descriptor_table_protodef_corpus_2eproto,
     "corpus.proto",
     &descriptor_table_corpus_2eproto_once,
@@ -184,7 +190,8 @@ PROTOBUF_NDEBUG_INLINE SentenceRecord::Impl_::Impl_(
         _cached_size_{0},
         original_sentence_(arena, from.original_sentence_),
         normalized_sentence_(arena, from.normalized_sentence_),
-        source_path_(arena, from.source_path_) {}
+        source_path_(arena, from.source_path_),
+        casefolded_sentence_(arena, from.casefolded_sentence_) {}
 
 SentenceRecord::SentenceRecord(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -215,7 +222,8 @@ PROTOBUF_NDEBUG_INLINE SentenceRecord::Impl_::Impl_(
       : _cached_size_{0},
         original_sentence_(arena),
         normalized_sentence_(arena),
-        source_path_(arena) {}
+        source_path_(arena),
+        casefolded_sentence_(arena) {}
 
 inline void SentenceRecord::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -240,6 +248,7 @@ inline void SentenceRecord::SharedDtor(MessageLite& self) {
   this_._impl_.original_sentence_.Destroy();
   this_._impl_.normalized_sentence_.Destroy();
   this_._impl_.source_path_.Destroy();
+  this_._impl_.casefolded_sentence_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -286,16 +295,16 @@ SentenceRecord::GetClassData() const {
   return SentenceRecord_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 5, 0, 90, 2>
+const ::_pbi::TcParseTable<3, 6, 0, 109, 2>
 SentenceRecord::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_._has_bits_),
     0, // no _extensions_
-    5, 56,  // max_field_number, fast_idx_mask
+    6, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967264,  // skipmap
+    4294967232,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    5,  // num_field_entries
+    6,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     SentenceRecord_class_data_.base(),
@@ -307,8 +316,8 @@ SentenceRecord::_table_ = {
   }, {{
     {::_pbi::TcParser::MiniParse, {}},
     // uint32 sentence_id = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SentenceRecord, _impl_.sentence_id_), 3>(),
-     {8, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SentenceRecord, _impl_.sentence_id_), 4>(),
+     {8, 4, 0,
       PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.sentence_id_)}},
     // string original_sentence = 2;
     {::_pbi::TcParser::FastUS1,
@@ -323,16 +332,19 @@ SentenceRecord::_table_ = {
      {34, 2, 0,
       PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.source_path_)}},
     // uint32 offset = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SentenceRecord, _impl_.offset_), 4>(),
-     {40, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SentenceRecord, _impl_.offset_), 5>(),
+     {40, 5, 0,
       PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.offset_)}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // string casefolded_sentence = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 3, 0,
+      PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.casefolded_sentence_)}},
     {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // uint32 sentence_id = 1;
-    {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.sentence_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+    {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.sentence_id_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
     // string original_sentence = 2;
     {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.original_sentence_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // string normalized_sentence = 3;
@@ -340,15 +352,18 @@ SentenceRecord::_table_ = {
     // string source_path = 4;
     {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.source_path_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // uint32 offset = 5;
-    {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.offset_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+    {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.offset_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+    // string casefolded_sentence = 6;
+    {PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.casefolded_sentence_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
-    "\42\0\21\23\13\0\0\0"
+    "\42\0\21\23\13\0\23\0"
     "google_autocomplete.SentenceRecord"
     "original_sentence"
     "normalized_sentence"
     "source_path"
+    "casefolded_sentence"
   }},
 };
 PROTOBUF_NOINLINE void SentenceRecord::Clear() {
@@ -359,7 +374,7 @@ PROTOBUF_NOINLINE void SentenceRecord::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.original_sentence_.ClearNonDefaultToEmpty();
     }
@@ -369,8 +384,11 @@ PROTOBUF_NOINLINE void SentenceRecord::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.source_path_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.casefolded_sentence_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000030U)) {
     ::memset(&_impl_.sentence_id_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.offset_) -
         reinterpret_cast<char*>(&_impl_.sentence_id_)) + sizeof(_impl_.offset_));
@@ -399,7 +417,7 @@ PROTOBUF_NOINLINE void SentenceRecord::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // uint32 sentence_id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_sentence_id() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
@@ -438,11 +456,21 @@ PROTOBUF_NOINLINE void SentenceRecord::Clear() {
   }
 
   // uint32 offset = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_offset() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
           5, this_._internal_offset(), target);
+    }
+  }
+
+  // string casefolded_sentence = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (!this_._internal_casefolded_sentence().empty()) {
+      const ::std::string& _s = this_._internal_casefolded_sentence();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "google_autocomplete.SentenceRecord.casefolded_sentence");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
     }
   }
 
@@ -471,7 +499,7 @@ PROTOBUF_NOINLINE void SentenceRecord::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string original_sentence = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_original_sentence().empty()) {
@@ -493,15 +521,22 @@ PROTOBUF_NOINLINE void SentenceRecord::Clear() {
                                         this_._internal_source_path());
       }
     }
-    // uint32 sentence_id = 1;
+    // string casefolded_sentence = 6;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!this_._internal_casefolded_sentence().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_casefolded_sentence());
+      }
+    }
+    // uint32 sentence_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_sentence_id() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_sentence_id());
       }
     }
     // uint32 offset = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_offset() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_offset());
@@ -526,7 +561,7 @@ void SentenceRecord::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_original_sentence().empty()) {
         _this->_internal_set_original_sentence(from._internal_original_sentence());
@@ -555,11 +590,20 @@ void SentenceRecord::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!from._internal_casefolded_sentence().empty()) {
+        _this->_internal_set_casefolded_sentence(from._internal_casefolded_sentence());
+      } else {
+        if (_this->_impl_.casefolded_sentence_.IsDefault()) {
+          _this->_internal_set_casefolded_sentence("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_sentence_id() != 0) {
         _this->_impl_.sentence_id_ = from._impl_.sentence_id_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_offset() != 0) {
         _this->_impl_.offset_ = from._impl_.offset_;
       }
@@ -587,6 +631,7 @@ void SentenceRecord::InternalSwap(SentenceRecord* PROTOBUF_RESTRICT PROTOBUF_NON
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.original_sentence_, &other->_impl_.original_sentence_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.normalized_sentence_, &other->_impl_.normalized_sentence_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.source_path_, &other->_impl_.source_path_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.casefolded_sentence_, &other->_impl_.casefolded_sentence_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(SentenceRecord, _impl_.offset_)
       + sizeof(SentenceRecord::_impl_.offset_)

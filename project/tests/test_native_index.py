@@ -1,9 +1,11 @@
 import unittest
+import tempfile
 
 from src.autocomplete import select_indexed_completions, select_native_completions
 from src.indexer import build_search_data
 from src.models import SentenceData
 from src.native_index import DEFAULT_LIBRARY_PATH, NativeIndex
+from src.protobuf_store import save_corpus_chunks
 
 
 @unittest.skipUnless(
@@ -30,7 +32,6 @@ class NativeIndexTests(unittest.TestCase):
         python_results = select_indexed_completions("the", self.search_data)
         native_results = select_native_completions(
             "the",
-            self.search_data,
             self.native_index,
         )
 
@@ -40,7 +41,6 @@ class NativeIndexTests(unittest.TestCase):
         python_results = select_indexed_completions("thf cat", self.search_data)
         native_results = select_native_completions(
             "thf cat",
-            self.search_data,
             self.native_index,
         )
 
@@ -51,6 +51,20 @@ class NativeIndexTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "closed"):
             self.native_index.find_exact_top_k("the")
+
+    def test_cpp_loads_protobuf_chunks_without_python_index(self) -> None:
+        sentences = list(self.search_data.sentences_by_id.values())
+        with tempfile.TemporaryDirectory() as directory:
+            save_corpus_chunks(sentences, directory, chunk_size=2)
+            loaded = NativeIndex.from_protobuf_directory(directory)
+            try:
+                self.assertEqual(len(loaded), len(sentences))
+                results = select_native_completions("the", loaded)
+            finally:
+                loaded.close()
+
+        expected = select_indexed_completions("the", self.search_data)
+        self.assertEqual(results, expected)
 
 
 if __name__ == "__main__":

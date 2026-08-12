@@ -1,6 +1,10 @@
 """Command-line interface for the autocomplete project."""
 
-from src.autocomplete import get_best_k_completions, initialize
+from src.autocomplete import (
+    get_best_k_completions,
+    initialize,
+    initialize_from_protobuf,
+)
 
 
 def update_query(current_query: str, typed_text: str) -> str:
@@ -29,10 +33,17 @@ def print_completions(query: str) -> None:
         )
 
 
-def run_cli(root_path: str | None = None, use_native: bool = False) -> None:
+def run_cli(
+    root_path: str | None = None,
+    use_native: bool = False,
+    protobuf_directory: str | None = None,
+) -> None:
     """Load the data and run the interactive autocomplete prompt."""
 
-    initialize(root_path, use_native=use_native)
+    if protobuf_directory:
+        initialize_from_protobuf(protobuf_directory)
+    else:
+        initialize(root_path, use_native=use_native)
     current_query = ""
 
     print("The system is ready. Enter your text:")
@@ -62,5 +73,14 @@ if __name__ == "__main__":
         action="store_true",
         help="Use the compiled C++ candidate index",
     )
+    parser.add_argument(
+        "--protobuf",
+        metavar="DIRECTORY",
+        help="Load chunked Protobuf corpus directly in C++",
+    )
     arguments = parser.parse_args()
-    run_cli(arguments.root_path, use_native=arguments.native)
+    run_cli(
+        arguments.root_path,
+        use_native=arguments.native,
+        protobuf_directory=arguments.protobuf,
+    )
