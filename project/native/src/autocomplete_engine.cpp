@@ -171,7 +171,9 @@ public:
             throw std::invalid_argument("native index cache path is empty");
         }
 
-        std::filesystem::create_directories(cache_path.parent_path());
+        if (!cache_path.parent_path().empty()) {
+            std::filesystem::create_directories(cache_path.parent_path());
+        }
         const std::filesystem::path temporary_path = cache_path.string() + ".tmp";
         std::ofstream output(temporary_path, std::ios::binary | std::ios::trunc);
         if (!output) {
@@ -386,8 +388,8 @@ private:
         write_value(output, static_cast<std::uint64_t>(index.size()));
         std::vector<std::string> grams;
         grams.reserve(index.size());
-        for (const auto& [gram, ignored] : index) {
-            grams.push_back(gram);
+        for (const auto& entry : index) {
+            grams.push_back(entry.first);
         }
         std::sort(grams.begin(), grams.end());
 

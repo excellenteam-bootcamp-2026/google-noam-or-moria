@@ -1,5 +1,6 @@
 import unittest
 import tempfile
+from pathlib import Path
 
 from src.autocomplete import select_indexed_completions, select_native_completions
 from src.indexer import build_search_data
@@ -69,6 +70,26 @@ class NativeIndexTests(unittest.TestCase):
 
         expected = select_indexed_completions("the", self.search_data)
         self.assertEqual(results, expected)
+
+    def test_second_protobuf_load_reuses_the_native_cache(self) -> None:
+        sentences = list(self.search_data.sentences_by_id.values())
+        with tempfile.TemporaryDirectory() as directory:
+            save_corpus_chunks(sentences, directory, chunk_size=2)
+            first = NativeIndex.from_protobuf_directory(directory)
+            first.close()
+
+            cache_path = Path(directory) / ".autocomplete-native-index.cache"
+            self.assertTrue(cache_path.is_file())
+
+            second = NativeIndex.from_protobuf_directory(directory)
+            try:
+                self.assertEqual(len(second), len(sentences))
+                self.assertEqual(
+                    select_native_completions("the", second),
+                    select_indexed_completions("the", self.search_data),
+                )
+            finally:
+                second.close()
 
 
 class ProtobufCorpusFingerprintTests(unittest.TestCase):

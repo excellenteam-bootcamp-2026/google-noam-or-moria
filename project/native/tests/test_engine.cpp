@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <set>
 
@@ -37,6 +38,28 @@ int main() {
     );
     assert(fuzzy_result.count(20) == 1);
     autocomplete_engine_free_ids(fuzzy_ids);
+
+    const auto cache_path = std::filesystem::temp_directory_path() /
+        "google-autocomplete-native-cache-test.bin";
+    std::filesystem::remove(cache_path);
+    assert(autocomplete_engine_save_index_cache(
+        engine, cache_path.string().c_str(), "test-corpus"
+    ));
+    autocomplete_engine_destroy(engine);
+
+    engine = autocomplete_engine_create();
+    assert(engine != nullptr);
+    assert(autocomplete_engine_load_index_cache(
+        engine, cache_path.string().c_str(), "test-corpus"
+    ));
+    assert(autocomplete_engine_sentence_count(engine) == 3);
+    std::uint32_t cached_exact_ids[2] = {};
+    assert(autocomplete_engine_find_exact_top_k(
+        engine, "the", 2, cached_exact_ids
+    ) == 2);
+    assert(cached_exact_ids[0] == 20);
+    assert(cached_exact_ids[1] == 10);
+    std::filesystem::remove(cache_path);
 
     autocomplete_engine_destroy(engine);
     std::cout << "native engine tests passed\n";

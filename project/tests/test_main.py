@@ -52,7 +52,7 @@ def test_cli_loads_protobuf_directly_and_exits_cleanly(capsys) -> None:
     ):
         run_cli(protobuf_directory="chunks")
 
-    protobuf_initialize.assert_called_once_with("chunks")
+    protobuf_initialize.assert_called_once_with("chunks", cache_path=None)
     text_initialize.assert_not_called()
     assert "Goodbye." in capsys.readouterr().out
 

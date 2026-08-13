@@ -154,3 +154,16 @@ C++ validates the format version and sequential chunk numbers while reading,
 builds the indexes directly, and retains all metadata required for the final
 `AutoCompleteData`. Python receives only candidate records needed for scoring
 and display.
+
+## Persistent native index cache
+
+The chunked Protobuf corpus is the portable source-of-truth. The native
+unigram, bigram, and trigram indexes are derived data, so they are saved after
+the first C++ build as `.autocomplete-native-index.cache` beside the chunks.
+On later launches the engine calculates a fingerprint from the numbered chunk
+metadata and loads the complete native index directly when it matches. A
+changed, missing, or invalid cache is rebuilt from the chunks automatically.
+
+This removes duplicate Python posting lists and avoids reconstructing the C++
+index on every normal launch. The first-run measurements above still apply;
+the cache path must be benchmarked separately on the full corpus.
