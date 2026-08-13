@@ -1,5 +1,7 @@
 """Command-line interface for the autocomplete project."""
 
+from __future__ import annotations
+
 from src.autocomplete import (
     get_best_k_completions,
     initialize,

@@ -96,27 +96,23 @@ class BuildSearchDataTests(TestCase):
     def test_initialize_uses_configured_corpus_when_path_is_omitted(self) -> None:
         configured_path = "configured-corpus"
 
-        with (
-            patch.dict(
-                "os.environ",
-                {"GOOGLE_AUTOCOMPLETE_CORPUS": configured_path},
-            ),
-            patch("src.indexer.load_sentences", return_value=[]) as loader,
+        with patch.dict(
+            "os.environ",
+            {"GOOGLE_AUTOCOMPLETE_CORPUS": configured_path},
         ):
-            search_data = initialize()
+            with patch("src.indexer.load_sentences", return_value=[]) as loader:
+                search_data = initialize()
 
         loader.assert_called_once_with(configured_path)
         self.assertEqual(search_data.sentences_by_id, {})
 
     def test_explicit_path_overrides_configured_corpus(self) -> None:
-        with (
-            patch.dict(
-                "os.environ",
-                {"GOOGLE_AUTOCOMPLETE_CORPUS": "configured-corpus"},
-            ),
-            patch("src.indexer.load_sentences", return_value=[]) as loader,
+        with patch.dict(
+            "os.environ",
+            {"GOOGLE_AUTOCOMPLETE_CORPUS": "configured-corpus"},
         ):
-            initialize("explicit-corpus")
+            with patch("src.indexer.load_sentences", return_value=[]) as loader:
+                initialize("explicit-corpus")
 
         loader.assert_called_once_with("explicit-corpus")
 

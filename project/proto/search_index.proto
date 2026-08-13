@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package autocomplete;
+
+message Sentence {
+  int32 sentence_id = 1;
+  string original_sentence = 2;
+  string normalized_sentence = 3;
+  string source_path = 4;
+  int32 offset = 5;
+}
+
+message PostingList {
+  string gram = 1;
+  repeated int32 sentence_ids = 2;
+}
+
+message SearchIndex {
+  repeated Sentence sentences = 1;
+  repeated PostingList unigrams = 2;
+  repeated PostingList bigrams = 3;
+  repeated PostingList trigrams = 4;
+  string source_archive_hash = 5;
+}
