@@ -74,3 +74,5 @@ python -m pytest -q
 ```
 
 `STAGE_B.md` contains profiling methodology and benchmark results.
+`STAGE_C.md` contains the three Google-only personalization approaches, cost
+model, privacy/reliability boundary, and the Gemini reranking POC.

@@ -6,3 +6,5 @@ __pycache__/
 # the native cache is rebuilt automatically when their fingerprint changes.
 data/*.pb
 .autocomplete-native-index.cache
+.worktrees/
+.env

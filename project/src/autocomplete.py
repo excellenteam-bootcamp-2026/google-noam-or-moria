@@ -126,13 +126,27 @@ def set_search_data(search_data: SearchData) -> None:
 def get_best_k_completions(prefix: str) -> list[AutoCompleteData]:
     """Return the five best completions from the initialized search index."""
 
+    return get_candidate_completions(prefix, k=5)
+
+
+def get_candidate_completions(
+    prefix: str,
+    k: int,
+) -> list[AutoCompleteData]:
+    """Return a bounded candidate pool for ranking or personalization.
+
+    The required public function above remains unchanged. Stage C can request
+    more than five relevant candidates and rerank them without giving the LLM
+    access to the corpus or allowing it to invent completions.
+    """
+
     if _search_data is None:
         raise RuntimeError("Autocomplete data has not been initialized")
 
     if _native_index is not None:
-        return select_native_completions(prefix, _native_index, k=5)
+        return select_native_completions(prefix, _native_index, k=k)
 
-    return select_indexed_completions(prefix, _search_data, k=5)
+    return select_indexed_completions(prefix, _search_data, k=k)
 
 
 def select_native_completions(

@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 from src.autocomplete import (
     build_best_completions,
+    get_candidate_completions,
     get_best_k_completions,
     initialize,
     select_native_completions,
@@ -46,6 +47,19 @@ def test_required_public_function_runs_exact_then_fuzzy_end_to_end() -> None:
         "The xat typo",
     ]
     assert [result.score for result in results] == [6, 1]
+
+
+def test_stage_c_can_request_more_candidates_without_changing_public_api() -> None:
+    unindexed = indexed_search_data(count=12)
+    search_data = build_search_data(unindexed.sentences_by_id.values())
+    set_search_data(search_data)
+
+    with patch("src.autocomplete._native_index", None):
+        expanded = get_candidate_completions("sentence", k=10)
+        required_api = get_best_k_completions("sentence")
+
+    assert len(expanded) == 10
+    assert required_api == expanded[:5]
 
 
 def test_initialization_prepares_the_required_public_function() -> None:
