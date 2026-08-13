@@ -2,10 +2,12 @@
 #include "corpus.pb.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <queue>
 #include <stdexcept>
@@ -31,6 +33,48 @@ struct Sentence {
 
 using PostingList = std::vector<std::uint32_t>;
 using Index = std::unordered_map<std::string, PostingList>;
+
+constexpr std::array<char, 8> kCacheMagic = {'A', 'C', 'I', 'D', 'X', '0', '1', '\0'};
+constexpr std::uint32_t kCacheFormatVersion = 1;
+
+template <typename Value>
+void write_value(std::ostream& output, const Value& value) {
+    output.write(reinterpret_cast<const char*>(&value), sizeof(value));
+    if (!output) {
+        throw std::runtime_error("could not write native index cache");
+    }
+}
+
+template <typename Value>
+Value read_value(std::istream& input) {
+    Value value{};
+    input.read(reinterpret_cast<char*>(&value), sizeof(value));
+    if (!input) {
+        throw std::runtime_error("native index cache is truncated");
+    }
+    return value;
+}
+
+void write_string(std::ostream& output, const std::string& value) {
+    if (value.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::runtime_error("native index cache string is too large");
+    }
+    write_value(output, static_cast<std::uint32_t>(value.size()));
+    output.write(value.data(), static_cast<std::streamsize>(value.size()));
+    if (!output) {
+        throw std::runtime_error("could not write native index cache string");
+    }
+}
+
+std::string read_string(std::istream& input) {
+    const auto size = read_value<std::uint32_t>(input);
+    std::string value(size, '\0');
+    input.read(value.data(), static_cast<std::streamsize>(size));
+    if (!input) {
+        throw std::runtime_error("native index cache string is truncated");
+    }
+    return value;
+}
 
 std::vector<std::string> create_ngrams(const std::string& text, std::size_t n) {
     std::unordered_set<std::string> unique_grams;
@@ -117,6 +161,101 @@ public:
                 );
             }
         }
+    }
+
+    void save_index_cache(
+        const std::filesystem::path& cache_path,
+        const std::string& corpus_fingerprint
+    ) const {
+        if (cache_path.empty()) {
+            throw std::invalid_argument("native index cache path is empty");
+        }
+
+        std::filesystem::create_directories(cache_path.parent_path());
+        const std::filesystem::path temporary_path = cache_path.string() + ".tmp";
+        std::ofstream output(temporary_path, std::ios::binary | std::ios::trunc);
+        if (!output) {
+            throw std::runtime_error("could not create native index cache");
+        }
+
+        output.write(kCacheMagic.data(), static_cast<std::streamsize>(kCacheMagic.size()));
+        write_value(output, kCacheFormatVersion);
+        write_string(output, corpus_fingerprint);
+        write_value(output, static_cast<std::uint64_t>(sentences_.size()));
+        for (const Sentence& sentence : sentences_) {
+            write_value(output, sentence.id);
+            write_string(output, sentence.original);
+            write_string(output, sentence.normalized);
+            write_string(output, sentence.source);
+            write_value(output, sentence.offset);
+            write_string(output, sentence.sort_key);
+        }
+        write_index(output, unigram_index_);
+        write_index(output, bigram_index_);
+        write_index(output, trigram_index_);
+        output.close();
+        if (!output) {
+            throw std::runtime_error("could not finish native index cache");
+        }
+
+        std::error_code ignored;
+        std::filesystem::remove(cache_path, ignored);
+        std::filesystem::rename(temporary_path, cache_path);
+    }
+
+    void load_index_cache(
+        const std::filesystem::path& cache_path,
+        const std::string& expected_fingerprint
+    ) {
+        if (!sentences_.empty()) {
+            throw std::logic_error("cannot load a cache into a populated native index");
+        }
+
+        std::ifstream input(cache_path, std::ios::binary);
+        if (!input) {
+            throw std::runtime_error("could not open native index cache");
+        }
+        std::array<char, kCacheMagic.size()> magic{};
+        input.read(magic.data(), static_cast<std::streamsize>(magic.size()));
+        if (!input || magic != kCacheMagic) {
+            throw std::runtime_error("native index cache has an invalid header");
+        }
+        if (read_value<std::uint32_t>(input) != kCacheFormatVersion) {
+            throw std::runtime_error("native index cache has an unsupported version");
+        }
+        if (read_string(input) != expected_fingerprint) {
+            throw std::runtime_error("native index cache belongs to another corpus");
+        }
+
+        Engine restored;
+        const auto sentence_count = read_value<std::uint64_t>(input);
+        restored.sentences_.reserve(static_cast<std::size_t>(sentence_count));
+        for (std::uint64_t position = 0; position < sentence_count; ++position) {
+            Sentence sentence{
+                read_value<std::uint32_t>(input),
+                read_string(input),
+                read_string(input),
+                read_string(input),
+                read_value<std::uint32_t>(input),
+                read_string(input),
+            };
+            if (!restored.position_by_id_.emplace(
+                    sentence.id,
+                    restored.sentences_.size()
+                ).second) {
+                throw std::runtime_error("native index cache has duplicate sentence IDs");
+            }
+            restored.sentences_.push_back(std::move(sentence));
+        }
+        restored.unigram_index_ = read_index(input);
+        restored.bigram_index_ = read_index(input);
+        restored.trigram_index_ = read_index(input);
+
+        sentences_ = std::move(restored.sentences_);
+        position_by_id_ = std::move(restored.position_by_id_);
+        unigram_index_ = std::move(restored.unigram_index_);
+        bigram_index_ = std::move(restored.bigram_index_);
+        trigram_index_ = std::move(restored.trigram_index_);
     }
 
     std::size_t sentence_count() const {
@@ -243,6 +382,48 @@ public:
     }
 
 private:
+    static void write_index(std::ostream& output, const Index& index) {
+        write_value(output, static_cast<std::uint64_t>(index.size()));
+        std::vector<std::string> grams;
+        grams.reserve(index.size());
+        for (const auto& [gram, ignored] : index) {
+            grams.push_back(gram);
+        }
+        std::sort(grams.begin(), grams.end());
+
+        for (const std::string& gram : grams) {
+            const PostingList& posting = index.at(gram);
+            write_string(output, gram);
+            write_value(output, static_cast<std::uint64_t>(posting.size()));
+            output.write(
+                reinterpret_cast<const char*>(posting.data()),
+                static_cast<std::streamsize>(posting.size() * sizeof(std::uint32_t))
+            );
+            if (!output) {
+                throw std::runtime_error("could not write native index posting list");
+            }
+        }
+    }
+
+    static Index read_index(std::istream& input) {
+        const auto gram_count = read_value<std::uint64_t>(input);
+        Index index;
+        index.reserve(static_cast<std::size_t>(gram_count));
+        for (std::uint64_t position = 0; position < gram_count; ++position) {
+            std::string gram = read_string(input);
+            const auto posting_size = read_value<std::uint64_t>(input);
+            PostingList posting(static_cast<std::size_t>(posting_size));
+            input.read(
+                reinterpret_cast<char*>(posting.data()),
+                static_cast<std::streamsize>(posting.size() * sizeof(std::uint32_t))
+            );
+            if (!input || !index.emplace(std::move(gram), std::move(posting)).second) {
+                throw std::runtime_error("native index cache has an invalid posting list");
+            }
+        }
+        return index;
+    }
+
     static void add_to_index(
         Index& index,
         const std::string& text,
@@ -402,6 +583,46 @@ int autocomplete_engine_load_corpus_directory(
             }
             engine_from(handle).load_corpus_directory(
                 std::filesystem::u8path(directory_path_utf8)
+            );
+            return 1;
+        },
+        0
+    );
+}
+
+int autocomplete_engine_save_index_cache(
+    autocomplete_engine_handle handle,
+    const char* cache_path_utf8,
+    const char* corpus_fingerprint_utf8
+) {
+    return protect(
+        [&]() {
+            if (cache_path_utf8 == nullptr || corpus_fingerprint_utf8 == nullptr) {
+                throw std::invalid_argument("native index cache argument is null");
+            }
+            engine_from(handle).save_index_cache(
+                std::filesystem::u8path(cache_path_utf8),
+                corpus_fingerprint_utf8
+            );
+            return 1;
+        },
+        0
+    );
+}
+
+int autocomplete_engine_load_index_cache(
+    autocomplete_engine_handle handle,
+    const char* cache_path_utf8,
+    const char* expected_fingerprint_utf8
+) {
+    return protect(
+        [&]() {
+            if (cache_path_utf8 == nullptr || expected_fingerprint_utf8 == nullptr) {
+                throw std::invalid_argument("native index cache argument is null");
+            }
+            engine_from(handle).load_index_cache(
+                std::filesystem::u8path(cache_path_utf8),
+                expected_fingerprint_utf8
             );
             return 1;
         },

@@ -4,7 +4,11 @@ import tempfile
 from src.autocomplete import select_indexed_completions, select_native_completions
 from src.indexer import build_search_data
 from src.models import SentenceData
-from src.native_index import DEFAULT_LIBRARY_PATH, NativeIndex
+from src.native_index import (
+    DEFAULT_LIBRARY_PATH,
+    NativeIndex,
+    protobuf_corpus_fingerprint,
+)
 from src.protobuf_store import save_corpus_chunks
 
 
@@ -65,6 +69,24 @@ class NativeIndexTests(unittest.TestCase):
 
         expected = select_indexed_completions("the", self.search_data)
         self.assertEqual(results, expected)
+
+
+class ProtobufCorpusFingerprintTests(unittest.TestCase):
+    def test_changes_when_chunk_metadata_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            chunk = Path(directory) / "corpus-00000.pb"
+            chunk.write_bytes(b"first")
+            first = protobuf_corpus_fingerprint(directory)
+
+            chunk.write_bytes(b"second value")
+            second = protobuf_corpus_fingerprint(directory)
+
+        self.assertNotEqual(first, second)
+
+    def test_rejects_directory_without_corpus_chunks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(FileNotFoundError):
+                protobuf_corpus_fingerprint(directory)
 
 
 if __name__ == "__main__":

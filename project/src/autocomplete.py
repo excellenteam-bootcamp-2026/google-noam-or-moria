@@ -42,15 +42,21 @@ def initialize(root_path: str | None = None, use_native: bool = False) -> None:
     set_search_data(search_data)
 
 
-def initialize_from_protobuf(directory: str) -> None:
-    """Load chunked corpus data directly into the native C++ engine."""
+def initialize_from_protobuf(
+    directory: str,
+    cache_path: str | None = None,
+) -> None:
+    """Load a native cache or build it once from chunked protobuf data."""
 
     from src.native_index import NativeIndex
 
     global _native_index
     if _native_index is not None:
         _native_index.close()
-    _native_index = NativeIndex.from_protobuf_directory(directory)
+    _native_index = NativeIndex.from_protobuf_directory(
+        directory,
+        cache_path=cache_path,
+    )
 
     set_search_data(SearchData({}, {}, {}, {}))
 

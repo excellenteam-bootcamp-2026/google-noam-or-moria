@@ -44,6 +44,20 @@ AUTOCOMPLETE_API int autocomplete_engine_load_corpus_directory(
     const char* directory_path_utf8
 );
 
+// Persist and restore the fully built native index. The fingerprint is
+// calculated by Python from the protobuf chunk metadata and prevents an index
+// built for one corpus from being used with another corpus.
+AUTOCOMPLETE_API int autocomplete_engine_save_index_cache(
+    autocomplete_engine_handle handle,
+    const char* cache_path_utf8,
+    const char* corpus_fingerprint_utf8
+);
+AUTOCOMPLETE_API int autocomplete_engine_load_index_cache(
+    autocomplete_engine_handle handle,
+    const char* cache_path_utf8,
+    const char* expected_fingerprint_utf8
+);
+
 AUTOCOMPLETE_API std::size_t autocomplete_engine_sentence_count(
     autocomplete_engine_handle handle
 );

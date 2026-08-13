@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import hashlib
 from pathlib import Path
 from typing import Iterable
 
@@ -16,10 +17,32 @@ DEFAULT_LIBRARY_PATH = (
     / "Release"
     / "autocomplete_native.dll"
 )
+CACHE_FILE_NAME = ".autocomplete-native-index.cache"
 
 
 class NativeEngineError(RuntimeError):
     """Raised when the native autocomplete engine reports an error."""
+
+
+def protobuf_corpus_fingerprint(directory: str | Path) -> str:
+    """Return a cheap cache key for the numbered protobuf corpus chunks.
+
+    The key changes when a chunk is added, removed, renamed, resized, or
+    modified.  It avoids reading the whole corpus just to decide whether the
+    native index cache is reusable.
+    """
+    root = Path(directory)
+    chunks = sorted(root.glob("corpus-*.pb"))
+    if not chunks:
+        raise FileNotFoundError(f"No protobuf corpus chunks found in: {root}")
+
+    digest = hashlib.sha256()
+    for chunk in chunks:
+        metadata = chunk.stat()
+        digest.update(chunk.name.encode("utf-8"))
+        digest.update(str(metadata.st_size).encode("ascii"))
+        digest.update(str(metadata.st_mtime_ns).encode("ascii"))
+    return digest.hexdigest()
 
 
 class NativeIndex:
@@ -58,15 +81,29 @@ class NativeIndex:
         cls,
         directory: str | Path,
         library_path: str | Path | None = None,
+        cache_path: str | Path | None = None,
     ) -> "NativeIndex":
+        """Load the native cache when valid, otherwise build and save it."""
+        corpus_directory = Path(directory)
+        fingerprint = protobuf_corpus_fingerprint(corpus_directory)
+        destination = Path(cache_path or corpus_directory / CACHE_FILE_NAME)
         engine = cls(library_path)
+        if destination.is_file() and engine._load_index_cache(destination, fingerprint):
+            return engine
+
         loaded = engine._library.autocomplete_engine_load_corpus_directory(
             engine._handle,
-            str(Path(directory)).encode("utf-8"),
+            str(corpus_directory).encode("utf-8"),
         )
         if not loaded:
             engine.close()
             engine._raise_last_error("Could not load Protobuf corpus")
+
+        # A cache-write failure must not prevent a correct interactive search.
+        try:
+            engine._save_index_cache(destination, fingerprint)
+        except NativeEngineError:
+            pass
         return engine
 
     def _configure_signatures(self) -> None:
@@ -98,6 +135,18 @@ class NativeIndex:
             ctypes.c_char_p,
         ]
         self._library.autocomplete_engine_load_corpus_directory.restype = ctypes.c_int
+        self._library.autocomplete_engine_save_index_cache.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+        ]
+        self._library.autocomplete_engine_save_index_cache.restype = ctypes.c_int
+        self._library.autocomplete_engine_load_index_cache.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+        ]
+        self._library.autocomplete_engine_load_index_cache.restype = ctypes.c_int
         self._library.autocomplete_engine_sentence_count.argtypes = [ctypes.c_void_p]
         self._library.autocomplete_engine_sentence_count.restype = ctypes.c_size_t
         self._library.autocomplete_engine_find_exact_top_k.argtypes = [
@@ -135,6 +184,25 @@ class NativeIndex:
         encoded_error = self._library.autocomplete_engine_last_error()
         message = encoded_error.decode("utf-8") if encoded_error else fallback
         raise NativeEngineError(message)
+
+    def _load_index_cache(self, cache_path: Path, fingerprint: str) -> bool:
+        """Return False for a stale or invalid cache so the corpus is rebuilt."""
+        return bool(
+            self._library.autocomplete_engine_load_index_cache(
+                self._handle,
+                str(cache_path).encode("utf-8"),
+                fingerprint.encode("ascii"),
+            )
+        )
+
+    def _save_index_cache(self, cache_path: Path, fingerprint: str) -> None:
+        saved = self._library.autocomplete_engine_save_index_cache(
+            self._handle,
+            str(cache_path).encode("utf-8"),
+            fingerprint.encode("ascii"),
+        )
+        if not saved:
+            self._raise_last_error("Could not save native index cache")
 
     def add_sentences(self, sentences: Iterable[SentenceData]) -> None:
         self._ensure_open()

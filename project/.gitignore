@@ -16,3 +16,4 @@ vcpkg_installed/
 
 # Generated corpus data
 data/*.pb
+data/*.cache

@@ -37,11 +37,12 @@ def run_cli(
     root_path: str | None = None,
     use_native: bool = False,
     protobuf_directory: str | None = None,
+    cache_path: str | None = None,
 ) -> None:
     """Load the data and run the interactive autocomplete prompt."""
 
     if protobuf_directory:
-        initialize_from_protobuf(protobuf_directory)
+        initialize_from_protobuf(protobuf_directory, cache_path=cache_path)
     else:
         initialize(root_path, use_native=use_native)
     current_query = ""
@@ -81,9 +82,15 @@ if __name__ == "__main__":
         metavar="DIRECTORY",
         help="Load chunked Protobuf corpus directly in C++",
     )
+    parser.add_argument(
+        "--cache",
+        metavar="PATH",
+        help="Optional path for the persistent native index cache",
+    )
     arguments = parser.parse_args()
     run_cli(
         arguments.root_path,
         use_native=arguments.native,
         protobuf_directory=arguments.protobuf,
+        cache_path=arguments.cache,
     )
