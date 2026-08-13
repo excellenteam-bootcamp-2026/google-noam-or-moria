@@ -1,3 +1,8 @@
 __pycache__/
 .pytest_cache/
 *.py[cod]
+
+# Generated local search data.  The protobuf chunks are the portable corpus;
+# the native cache is rebuilt automatically when their fingerprint changes.
+data/*.pb
+.autocomplete-native-index.cache
