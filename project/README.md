@@ -67,6 +67,44 @@ The first run creates the native cache. Later runs reuse it automatically.
 - `#` resets the query.
 - `Ctrl+C` exits.
 
+## Run the personalized product
+
+Install the optional official Google Gemini SDK and configure the API key:
+
+```powershell
+python -m pip install -r requirements-stage-c.txt
+$env:GEMINI_API_KEY = "your-Google-AI-Studio-key"
+```
+
+Run the complete product on the Protobuf corpus and persistent native index:
+
+```powershell
+python -m src.main `
+  --protobuf "C:\path\to\protobuf-output" `
+  --personalized `
+  --user-id "noam"
+```
+
+The user flow is:
+
+1. Type text and press Enter to get up to five suggestions.
+2. Continue typing and press Enter again, or enter `#` to reset.
+3. Enter `:select 2` to select suggestion 2 and save that explicit choice.
+4. Future searches use the recent selected sentences for personalized ranking.
+
+The original match score always remains the primary ranking criterion. Gemini
+only changes the order of results that have the same score, so personalization
+cannot replace a more relevant exact result with a weaker fuzzy result.
+
+The local demonstration history is stored in `.autocomplete-history.json` and
+is ignored by Git. The file keeps at most 100 entries per user. Gemini receives
+only recent queries, selected sentence text, and a bounded candidate pool; it
+does not receive user IDs, file paths, offsets, or the whole corpus.
+
+If the SDK, API key, network, quota, or Gemini response is unavailable, the
+product remains operational and returns the original non-personalized top five.
+This fallback is intentional and covered by tests.
+
 ## Tests
 
 ```powershell

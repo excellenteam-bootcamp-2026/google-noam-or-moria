@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from src.models import AutoCompleteData
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
 DEFAULT_CANDIDATE_POOL_SIZE = 20
 DEFAULT_HISTORY_LIMIT = 20
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,9 @@ class SearchHistoryStore(Protocol):
     def recent(self, user_id: str, limit: int) -> Sequence[SearchHistoryEntry]:
         """Return the user's most recent selections, newest first."""
 
+    def record(self, user_id: str, entry: SearchHistoryEntry) -> None:
+        """Persist one selection for future personalized searches."""
+
 
 class InMemorySearchHistoryStore:
     """Small POC store used by tests and local demonstrations."""
@@ -44,6 +49,65 @@ class InMemorySearchHistoryStore:
         if limit <= 0:
             return []
         return tuple(self._entries.get(user_id, ())[:limit])
+
+
+class JsonSearchHistoryStore:
+    """Persistent local history for the command-line product demonstration."""
+
+    def __init__(self, path: str, maximum_entries_per_user: int = 100) -> None:
+        if maximum_entries_per_user <= 0:
+            raise ValueError("maximum_entries_per_user must be positive")
+        self._path = os.path.abspath(path)
+        self._maximum_entries_per_user = maximum_entries_per_user
+
+    def _load(self) -> dict[str, list[dict[str, str]]]:
+        if not os.path.exists(self._path):
+            return {}
+        try:
+            with open(self._path, "r", encoding="utf-8") as history_file:
+                value = json.load(history_file)
+        except (OSError, json.JSONDecodeError):
+            LOGGER.warning("Ignoring unreadable search history at %s", self._path)
+            return {}
+        if not isinstance(value, dict):
+            return {}
+        return value
+
+    def _save(self, value: dict[str, list[dict[str, str]]]) -> None:
+        directory = os.path.dirname(self._path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        temporary_path = self._path + ".tmp"
+        with open(temporary_path, "w", encoding="utf-8") as history_file:
+            json.dump(value, history_file, ensure_ascii=False, indent=2)
+        os.replace(temporary_path, self._path)
+
+    def record(self, user_id: str, entry: SearchHistoryEntry) -> None:
+        value = self._load()
+        entries = value.setdefault(user_id, [])
+        entries.insert(
+            0,
+            {
+                "query": entry.query,
+                "selected_sentence": entry.selected_sentence,
+            },
+        )
+        del entries[self._maximum_entries_per_user :]
+        self._save(value)
+
+    def recent(self, user_id: str, limit: int) -> Sequence[SearchHistoryEntry]:
+        if limit <= 0:
+            return []
+        entries = self._load().get(user_id, [])
+        valid_entries = []
+        for value in entries:
+            if not isinstance(value, dict):
+                continue
+            query = value.get("query")
+            selected_sentence = value.get("selected_sentence")
+            if isinstance(query, str) and isinstance(selected_sentence, str):
+                valid_entries.append(SearchHistoryEntry(query, selected_sentence))
+        return tuple(valid_entries[:limit])
 
 
 class CandidateOrderModel(Protocol):
@@ -193,7 +257,20 @@ class GeminiCandidateReranker:
         prompt = build_reranking_prompt(query, history, candidates)
         proposed = self._model.rank(prompt, len(candidates))
         order = sanitize_candidate_order(proposed, len(candidates))
-        return [candidates[index] for index in order[:limit]]
+        personalized_position = {
+            candidate_index: position
+            for position, candidate_index in enumerate(order)
+        }
+        # Preserve Stage A correctness: lexical relevance remains primary.
+        # Personal history only breaks ties between equally relevant results.
+        ranked_indexes = sorted(
+            range(len(candidates)),
+            key=lambda index: (
+                -candidates[index].score,
+                personalized_position[index],
+            ),
+        )
+        return [candidates[index] for index in ranked_indexes[:limit]]
 
 
 class PersonalizedAutocomplete:
@@ -223,7 +300,21 @@ class PersonalizedAutocomplete:
         history = self._history_store.recent(user_id, self._history_limit)
         try:
             return self._reranker.rerank(query, history, candidates, limit=5)
-        except Exception:
+        except Exception as error:
             # Personalization must never make the reliable Stage A/B search
             # unavailable because of an API, quota, parsing, or network error.
+            LOGGER.warning("Personalization unavailable; using base rank: %s", error)
             return candidates[:5]
+
+    def record_selection(
+        self,
+        user_id: str,
+        query: str,
+        completion: AutoCompleteData,
+    ) -> None:
+        """Persist only an explicit user selection, not every typed prefix."""
+
+        self._history_store.record(
+            user_id,
+            SearchHistoryEntry(query, completion.completed_sentence),
+        )

@@ -10,6 +10,8 @@ candidates and Stage C may only reorder their numeric IDs. Gemini never sees
 the corpus, source paths, user ID, or file offsets and cannot invent a result.
 Invalid, duplicate, or missing IDs are sanitized. API, quota, network, and JSON
 failures return the original top five.
+The Stage A match score remains the primary sort key; the personalized order
+is used only to break ties, keeping relevance separate from preference.
 
 The required `get_best_k_completions(prefix)` signature is unchanged. The new
 internal `get_candidate_completions(prefix, k)` supplies a larger candidate
@@ -134,6 +136,16 @@ Unit tests use a fake model and never call an external API:
 ```powershell
 python -m pytest -q tests/test_personalization.py tests/test_cost_estimation.py
 ```
+
+Run the integrated CLI after Stage B has produced the Protobuf chunks:
+
+```powershell
+python -m src.main --protobuf C:\path\to\chunks --personalized --user-id noam
+```
+
+After suggestions are displayed, `:select N` records an explicit selection.
+The next query uses that persisted history. Missing Gemini credentials or an
+API failure automatically falls back to the ordinary Stage A/B ranking.
 
 Official references:
 

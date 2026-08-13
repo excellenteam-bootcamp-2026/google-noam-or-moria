@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 
 from src.models import AutoCompleteData
@@ -8,6 +10,7 @@ from src.personalization import (
     GeminiCandidateReranker,
     GeminiJsonOrderModel,
     InMemorySearchHistoryStore,
+    JsonSearchHistoryStore,
     PersonalizedAutocomplete,
     SearchHistoryEntry,
     build_reranking_prompt,
@@ -56,7 +59,10 @@ def test_invalid_or_duplicate_model_ids_cannot_invent_results() -> None:
 
 
 def test_reranker_uses_history_and_preserves_candidate_objects() -> None:
-    source = candidates()
+    source = [
+        AutoCompleteData(f"Candidate {index}", "data.txt", index, 10)
+        for index in range(8)
+    ]
     model = FixedOrderModel([4, 2, 0, 1, 3])
     reranker = GeminiCandidateReranker(model)
 
@@ -68,6 +74,22 @@ def test_reranker_uses_history_and_preserves_candidate_objects() -> None:
 
     assert results == [source[4], source[2], source[0], source[1], source[3]]
     assert model.prompts[0][1] == len(source)
+
+
+def test_personalization_never_promotes_a_lower_lexical_score() -> None:
+    source = [
+        AutoCompleteData("Exact result", "data.txt", 1, 20),
+        AutoCompleteData("Fuzzy history favorite", "data.txt", 2, 19),
+    ]
+    reranker = GeminiCandidateReranker(FixedOrderModel([1, 0]))
+
+    results = reranker.rerank(
+        "query",
+        [SearchHistoryEntry("old", "Fuzzy history favorite")],
+        source,
+    )
+
+    assert results == source
 
 
 def test_empty_history_skips_the_model_call() -> None:
@@ -117,3 +139,29 @@ def test_google_adapter_requests_constrained_json() -> None:
     assert calls[0]["model"] == "gemini-2.5-flash-lite"
     assert calls[0]["config"]["response_mime_type"] == "application/json"
     assert calls[0]["config"]["response_json_schema"]["required"] == ["order"]
+
+
+def test_json_history_survives_a_new_store_instance() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        path = str(Path(directory) / "history.json")
+        first = JsonSearchHistoryStore(path)
+        first.record("noam", SearchHistoryEntry("cat", "The cat sleeps"))
+
+        second = JsonSearchHistoryStore(path)
+        history = second.recent("noam", 20)
+
+    assert history == (SearchHistoryEntry("cat", "The cat sleeps"),)
+
+
+def test_json_history_is_bounded_per_user() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        store = JsonSearchHistoryStore(
+            str(Path(directory) / "history.json"),
+            maximum_entries_per_user=2,
+        )
+        for index in range(3):
+            store.record("noam", SearchHistoryEntry(str(index), str(index)))
+
+        history = store.recent("noam", 20)
+
+    assert [entry.query for entry in history] == ["2", "1"]

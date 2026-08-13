@@ -8,3 +8,4 @@ data/*.pb
 .autocomplete-native-index.cache
 .worktrees/
 .env
+.autocomplete-history.json
