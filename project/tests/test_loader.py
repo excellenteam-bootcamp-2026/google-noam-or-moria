@@ -5,6 +5,7 @@ from unittest import TestCase
 from src.loader import load_sentences
 
 
+
 class LoadSentencesTests(TestCase):
     def test_loads_nested_text_files_and_preserves_metadata(self) -> None:
         with TemporaryDirectory() as temporary_directory:
