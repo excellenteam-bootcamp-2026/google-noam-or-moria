@@ -42,6 +42,30 @@ class TestMatcher(unittest.TestCase):
         sentence = f"prefix {query[:80]}x{query[81:]} suffix"
         self.assertEqual(calculate_best_match(query, sentence), len(query) * 2 - 1)
 
+    def test_agreed_exact_and_one_edit_acceptance_cases(self):
+        cases = [
+            ("cat", "cat", 6),
+            ("xat", "cat", 1),
+            # "ca" is already an exact substring of "cat"; fuzzy scoring is
+            # not used merely because the source sentence has more text.
+            ("ca", "cat", 4),
+            ("caat", "cat", 0),
+            ("xatt", "cat", None),
+        ]
+
+        for query, sentence, expected_score in cases:
+            with self.subTest(query=query, sentence=sentence):
+                self.assertEqual(
+                    calculate_best_match(query, sentence),
+                    expected_score,
+                )
+
+    def test_second_error_stops_a_long_candidate(self):
+        query = "a" * 200
+        sentence = "x" + ("a" * 198) + "x"
+
+        self.assertIsNone(calculate_best_match(query, sentence))
+
 
 if __name__ == "__main__":
     unittest.main()

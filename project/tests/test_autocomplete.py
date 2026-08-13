@@ -4,9 +4,11 @@ from src.autocomplete import (
     build_best_completions,
     get_best_k_completions,
     initialize,
+    select_native_completions,
     select_staged_completions,
     set_search_data,
 )
+from src.indexer import build_search_data
 from src.models import SearchData, SentenceData
 
 
@@ -24,6 +26,26 @@ def test_required_public_function_uses_initialized_search_index() -> None:
         get_best_k_completions("stored")
 
     indexed_search.assert_called_once_with("stored", search_data, k=5)
+
+
+def test_required_public_function_runs_exact_then_fuzzy_end_to_end() -> None:
+    search_data = build_search_data(
+        [
+            SentenceData(1, "The cat sleeps", "the cat sleeps", "a.txt", 1),
+            SentenceData(2, "The xat typo", "the xat typo", "b.txt", 2),
+            SentenceData(3, "Nothing relevant", "nothing relevant", "c.txt", 3),
+        ]
+    )
+    set_search_data(search_data)
+
+    with patch("src.autocomplete._native_index", None):
+        results = get_best_k_completions("cat")
+
+    assert [result.completed_sentence for result in results] == [
+        "The cat sleeps",
+        "The xat typo",
+    ]
+    assert [result.score for result in results] == [6, 1]
 
 
 def test_initialization_prepares_the_required_public_function() -> None:
@@ -184,3 +206,39 @@ def test_staged_search_does_not_score_the_same_candidate_twice() -> None:
         )
 
     assert matcher.call_count == 3
+
+
+def test_native_search_fetches_each_fuzzy_candidate_only_once() -> None:
+    sentences = {
+        1: SentenceData(1, "The cat", "the cat", "a.txt", 1),
+        2: SentenceData(2, "The car", "the car", "b.txt", 2),
+    }
+    native_index = Mock()
+    native_index.find_exact_top_k.return_value = []
+    native_index.find_fuzzy_candidate_ids.return_value = {1, 2}
+    native_index.get_sentence.side_effect = sentences.__getitem__
+
+    results = select_native_completions("the ca", native_index)
+
+    assert len(results) == 2
+    assert native_index.get_sentence.call_count == 2
+
+
+def test_large_candidate_collection_keeps_the_same_top_five_order() -> None:
+    search_data = indexed_search_data(count=1_000)
+    scores = {
+        sentence_id: sentence_id % 17
+        for sentence_id in search_data.sentences_by_id
+    }
+
+    results = build_best_completions(scores, search_data, k=5)
+
+    assert len(results) == 5
+    assert [result.score for result in results] == [16, 16, 16, 16, 16]
+    assert [result.completed_sentence for result in results] == [
+        "Sentence 101",
+        "Sentence 118",
+        "Sentence 135",
+        "Sentence 152",
+        "Sentence 16",
+    ]

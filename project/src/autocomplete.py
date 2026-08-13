@@ -2,15 +2,68 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from heapq import nsmallest
 
 from src.matcher import calculate_best_match
-from src.models import AutoCompleteData, SearchData
+from src.models import AutoCompleteData, SearchData, SentenceData
 
 
 _search_data: SearchData | None = None
 _native_index: object | None = None
+
+
+def _scored_sentence_rank(
+    scored_sentence: tuple[SentenceData, int],
+) -> tuple[object, ...]:
+    """Return the single deterministic ordering used by every search path."""
+
+    sentence, score = scored_sentence
+    return (
+        -score,
+        sentence.original_sentence.casefold(),
+        sentence.original_sentence,
+        sentence.source_path,
+        sentence.offset,
+    )
+
+
+def _top_completions(
+    scored_sentences: Iterable[tuple[SentenceData, int]],
+    k: int,
+) -> list[AutoCompleteData]:
+    """Keep only the best K records and materialize public results for them."""
+
+    if k <= 0:
+        return []
+    best = nsmallest(k, scored_sentences, key=_scored_sentence_rank)
+    return [_to_completion(sentence, score) for sentence, score in best]
+
+
+def _to_completion(sentence: SentenceData, score: int) -> AutoCompleteData:
+    """Convert one internal sentence record to the required public result."""
+
+    return AutoCompleteData(
+        completed_sentence=sentence.original_sentence,
+        source_text=sentence.source_path,
+        offset=sentence.offset,
+        score=score,
+    )
+
+
+def _build_scored_completions(
+    candidate_scores: Mapping[int, int | None],
+    get_sentence: Callable[[int], SentenceData],
+    k: int,
+) -> list[AutoCompleteData]:
+    """Rank scored IDs using a sentence provider from either backend."""
+
+    def scored_sentences() -> Iterable[tuple[SentenceData, int]]:
+        for sentence_id, score in candidate_scores.items():
+            if score is not None:
+                yield get_sentence(sentence_id), score
+
+    return _top_completions(scored_sentences(), k)
 
 
 def initialize(root_path: str | None = None, use_native: bool = False) -> None:
@@ -97,20 +150,29 @@ def select_native_completions(
 
     exact_ids = native_index.find_exact_top_k(normalized_query, k)
     exact_score = len(normalized_query) * 2
-    exact_matches = {sentence_id: exact_score for sentence_id in exact_ids}
-    if len(exact_matches) >= k:
-        return build_native_completions(exact_matches, native_index, k)
+    exact_id_set = set(exact_ids)
 
-    candidate_scores: dict[int, int | None] = dict(exact_matches)
-    fuzzy_ids = native_index.find_fuzzy_candidate_ids(normalized_query)
-    for sentence_id in fuzzy_ids - exact_matches.keys():
-        sentence = native_index.get_sentence(sentence_id)
-        candidate_scores[sentence_id] = calculate_best_match(
-            normalized_query,
-            sentence.normalized_sentence,
-        )
+    def scored_sentences() -> Iterable[tuple[SentenceData, int]]:
+        for sentence_id in exact_ids:
+            sentence = native_index.get_sentence(sentence_id)
+            yield sentence, exact_score
 
-    return build_native_completions(candidate_scores, native_index, k)
+        if len(exact_ids) >= k:
+            return
+
+        fuzzy_ids = native_index.find_fuzzy_candidate_ids(normalized_query)
+        for sentence_id in fuzzy_ids - exact_id_set:
+            # Fetch each native record once: it is used both for scoring and,
+            # when valid, for the public result returned to Python.
+            sentence = native_index.get_sentence(sentence_id)
+            score = calculate_best_match(
+                normalized_query,
+                sentence.normalized_sentence,
+            )
+            if score is not None:
+                yield sentence, score
+
+    return _top_completions(scored_sentences(), k)
 
 
 def build_native_completions(
@@ -120,33 +182,11 @@ def build_native_completions(
 ) -> list[AutoCompleteData]:
     """Build public results by copying only selected records from C++."""
 
-    if k <= 0:
-        return []
-
-    matches: list[AutoCompleteData] = []
-    for sentence_id, score in candidate_scores.items():
-        if score is None:
-            continue
-        sentence = native_index.get_sentence(sentence_id)
-        matches.append(
-            AutoCompleteData(
-                sentence.original_sentence,
-                sentence.source_path,
-                sentence.offset,
-                score,
-            )
-        )
-
-    matches.sort(
-        key=lambda result: (
-            -result.score,
-            result.completed_sentence.casefold(),
-            result.completed_sentence,
-            result.source_text,
-            result.offset,
-        )
+    return _build_scored_completions(
+        candidate_scores,
+        native_index.get_sentence,
+        k,
     )
-    return matches[:k]
 
 
 def build_best_completions(
@@ -162,34 +202,11 @@ def build_best_completions(
     before their branches are ready.
     """
 
-    if k <= 0:
-        return []
-
-    matches: list[AutoCompleteData] = []
-    for sentence_id, score in candidate_scores.items():
-        if score is None:
-            continue
-
-        sentence = search_data.sentences_by_id[sentence_id]
-        matches.append(
-            AutoCompleteData(
-                completed_sentence=sentence.original_sentence,
-                source_text=sentence.source_path,
-                offset=sentence.offset,
-                score=score,
-            )
-        )
-
-    matches.sort(
-        key=lambda result: (
-            -result.score,
-            result.completed_sentence.casefold(),
-            result.completed_sentence,
-            result.source_text,
-            result.offset,
-        )
+    return _build_scored_completions(
+        candidate_scores,
+        search_data.sentences_by_id.__getitem__,
+        k,
     )
-    return matches[:k]
 
 
 def select_indexed_completions(
@@ -258,15 +275,22 @@ def select_staged_completions(
     if len(exact_matches) >= k:
         return build_best_completions(exact_matches, search_data, k)
 
-    candidate_scores: dict[int, int | None] = dict(exact_matches)
-    fuzzy_candidate_ids = find_fuzzy_candidates(normalized_query, search_data)
-    # Exact-index false positives may still be valid one-edit matches, so only
-    # candidates already verified as exact are excluded from fuzzy scoring.
-    additional_ids = fuzzy_candidate_ids - exact_matches.keys()
-    for sentence_id in additional_ids:
-        candidate_scores[sentence_id] = calculate_best_match(
-            normalized_query,
-            search_data.sentences_by_id[sentence_id].normalized_sentence,
-        )
+    def scored_sentences() -> Iterable[tuple[SentenceData, int]]:
+        for sentence_id in exact_ids:
+            sentence = search_data.sentences_by_id[sentence_id]
+            yield sentence, exact_score
 
-    return build_best_completions(candidate_scores, search_data, k)
+        fuzzy_candidate_ids = find_fuzzy_candidates(normalized_query, search_data)
+        # Exact-index false positives may still be valid one-edit matches, so
+        # only candidates already verified as exact are excluded here.
+        additional_ids = fuzzy_candidate_ids - exact_matches.keys()
+        for sentence_id in additional_ids:
+            sentence = search_data.sentences_by_id[sentence_id]
+            score = calculate_best_match(
+                normalized_query,
+                sentence.normalized_sentence,
+            )
+            if score is not None:
+                yield sentence, score
+
+    return _top_completions(scored_sentences(), k)
